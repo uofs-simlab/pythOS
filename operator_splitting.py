@@ -16,8 +16,8 @@ except:
     Function = type(None)
     Constant = type(None)
 
-from EpiMethods import epi_methods, EPIMethod
-
+epi_methods = {}
+EPIMethod = type(None)
 def time_step(function, delta_t, y, initial_t,
                     tableau, index, **kwargs):
     """
