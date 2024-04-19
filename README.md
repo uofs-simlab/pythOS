@@ -137,15 +137,15 @@ Optional arguments are:
 
 - fname: a filename to save intermediate results to.  
   
-	  When using the finite element capabilities of firedrake this is a 
-	  .h5 file accessible through the `CheckpointFile` interface from 
-	  firedrake. Otherwise this is a .csv file containing time in the 
-	  first entry of each line, and the solution in the remaining entries
+	When using the finite element capabilities of firedrake this is a 
+	.h5 file accessible through the `CheckpointFile` interface from 
+	firedrake. Otherwise this is a .csv file containing time in the 
+	first entry of each line, and the solution in the remaining entries
 
 - save\_steps: the number of intermediate steps to save.  
   
-	  The default is to save steps at delta\_t time interval if a filename
-	  is provided.
+	The default is to save steps at delta\_t time interval if a filename
+	is provided.
 
 - ivp\_methods: a dictionary to control the selection of the EXACT solver. 
   
@@ -161,8 +161,8 @@ Optional arguments are:
 	 - Heun-Euler
 	 - any method not listed, by providing an instance of the `EmbeddedTableau` class found in `butcher_tableau.py`
 	 
-	  When using firedrake, only the exact solvers implemented in pythOS 
-	  are options (or a new method using the `EmbeddedTableau` class)
+	 When using firedrake, only the exact solvers implemented in pythOS 
+	 are options (or a new method using the `EmbeddedTableau` class)
 
 - solver_parameters: A dictionary to provide optional arguments to the underlying solvers.
 
