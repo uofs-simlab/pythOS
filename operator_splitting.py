@@ -15,11 +15,31 @@ except:
     fem = False
     Function = type(None)
     Constant = type(None)
+try:
+    from irksome import TimeStepper
+    from irksome.ButcherTableaux import ButcherTableau
+except Exception as e:
+    print('no irksome solvers')
+    ButcherTableau = type(None)
+    
 
-epi_methods = {}
-EPIMethod = type(None)
+try:
+    from sundials import SundialsSolver
+    from cvode import CVODE
+    from ida import IDA
+    from arkode import ARKStep, ERKStep, MRIStep
+    from sundials_exode import SundialsExode
+except Exception as e:
+    print('no sundials solvers')
+    cvode = False
+    SundialsSolver = type(None)
+    IDA = type(None)
+    SundialsExode = type(None)
+
+from Epi_multistep import EpiMultistep, epi_methods
+
 def time_step(function, delta_t, y, initial_t,
-                    tableau, index, **kwargs):
+                    tableau, restore=False, **kwargs):
     """
     This function takes a step in time in the differential equation.
     Inputs
@@ -40,35 +60,44 @@ def time_step(function, delta_t, y, initial_t,
         type depends on type of initial_y
         the approximate value of y after the given delta_t
     """
+    if delta_t == 0:
+        return y
     if isinstance(tableau, Tableau):
-        f=tableau.y_step(function, y, initial_t, delta_t, index, **kwargs)
+        f=tableau.y_step(function, y, initial_t, delta_t, **kwargs)
         if isinstance(y, Function):
-            y.assign(y + delta_t * f)
-        elif np.size(y)!=1:
-            y[index]+=delta_t*f[index]  
+            if delta_t.imag != 0:
+                y.assign(y + complex(delta_t) * f)
+            else:
+                y.assign(y + float(delta_t) * f)
         else:
             y+=delta_t*f
-    else:
+    elif isinstance(tableau, tuple) and isinstance(tableau[0], EpiMultistep):
         tableau, info = tableau
-        y = tableau.step(function, initial_t, y, delta_t, info, **kwargs)
+        y = tableau.solve(function, initial_t, y, delta_t, options=info, **kwargs)
+    else:
+        if restore:
+            yi = Function(tableau.u0)
+        tableau.u0.assign(y)
+        tableau.dt.assign(delta_t)
+        tableau.advance()
+        if restore:
+            y.assign(tableau.u0)
+            tableau.u0.assign(yi)
     return y
 
-def time_step_analytic(function, delta_t, y, initial_t, index):
+def time_step_analytic(function, delta_t, y, initial_t):
     # this function takes the analytic solution of the DE and returns it.
     # Only used when we want to use analytic solution for each sub-integrators instead of numerically exact values.
     f = function(delta_t,y)   
     if isinstance(y, Function):
         y.assign(f)
         return y
-    f = np.array(f)   
-    if np.size(y) != 1:
-        y[index] = f[index]
     else:
         y = f
     return y
 
-def exact_solution(function, initial_t, delta_t, initial_y, ivp_method, mask,
-                   rtol, atol, **kwargs):
+def exact_solution(function, initial_t, delta_t, initial_y, ivp_method,
+                   rtol, atol, J = None, params={}):
     """
     ----------
     This function finds a highly accurate numerical solution for a 
@@ -89,29 +118,45 @@ def exact_solution(function, initial_t, delta_t, initial_y, ivp_method, mask,
     rtol, atol : 
         float or array_like. Relative and absolute tolerances.
         If using an EmbeddedTableau as the method, must be float, 
-            and only rtol is used
         
     Returns
     -------
     y : Value of the solution at the final t in the subinterval.
     """
+    kwargs = params if params is not None else {}
+    
     tf = initial_t + delta_t
+    if delta_t == 0:
+        return initial_y
     t_span = (initial_t, tf)
     y0 = initial_y
     if isinstance(ivp_method, EmbeddedTableau):
-        y = ivp_method.y_step(function, initial_y, initial_t, delta_t, mask, rtol, **kwargs)
+        y = ivp_method.y_step(function, initial_y, initial_t, delta_t, rtol, atol, **kwargs)
+    elif isinstance(ivp_method, SundialsSolver):
+        y = ivp_method.solve(initial_y, initial_t, tf, J)
     else:
         sol = solve_ivp(function, t_span, y0, method = ivp_method, 
-                        rtol = rtol, atol = atol, dense_output = True)
+                        rtol = rtol, atol = atol, t_eval = [initial_t, tf], **kwargs)
+        if not sol.success:
+            print('exact integration failed')
+            return np.nan + initial_y
         y = sol.y[:,-1]
     return y
 
 
-def process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods, b=None, ivp_methods={}, epi_options={}, jacobian = None):
-    alpha, order = alphas_repo(alpha, b, len(functions))
+def process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods, b=None, ivp_methods={}, epi_options={}, jacobian = None, solver_options = {}):
+    alpha, order, k_factor = alphas_repo(alpha, b, len(functions))
     
     if order is not None:
-        delta_t = 1
+        if isinstance(delta_t, Function):
+            delta_t.assign(1)
+        elif isinstance(delta_t, Constant):
+            delta_t.assign(1)
+        else:
+            delta_t = 1
+        dt = 1
+    else:
+        dt = float(delta_t)
     function_list = []
     if not isinstance(initial_y, Function):
         complex_flag = (initial_y.dtype == np.complex128)
@@ -146,71 +191,87 @@ def process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods,
                 tableau = methods[(0,)]
             else:
                 tableau='FE'
-            
 
             if tableau in tableaus:
                 tableau=tableaus[tableau]   # matching RK method name with RK coefficients
             elif tableau in epi_methods:
-                tableau = epi_methods[tableau]
-            if isinstance(tableau, EPIMethod):
+                tableau = EpiMultistep(epi_methods[tableau])
+            if isinstance(tableau, EpiMultistep):
                 if k+1 in epi_options:
                     info = epi_options[k+1]
                 elif 0 in epi_options:
                     info = epi_options[0]
                 else:
+                    #info = ('Dormand-Prince', (1e-10, 1e-12))
                     info = ('kiops', 1e-10)
+                        
+                if info[0] in ['CV_ADAMS', 'CV_BDF'] or 'ARKODE' in info[0] or 'ARKODE' in info[0][1]:
+                    options = solver_options[k+1] if k+1 in solver_options else {}
+                    info = (SundialsExode(initial_y, info[0], info[1][0], info[1][1], **options), info[1])
                 tableau = (tableau, info)
-            exact_flag = (tableau == 'EXACT') 
+            exact_flag = (tableau == 'EXACT')
+            if isinstance(tableau, ButcherTableau):
+                options = solver_options[k+1] if k+1 in solver_options else {}
+                tableau = TimeStepper(function, tableau, initial_t, delta_t, initial_y, **options)
             if tableau == 'EXACT':
                 if k+1 in ivp_methods:
                     tableau = ivp_methods[k+1]
+                elif isinstance(initial_y, Function):
+                    tableau = ('Dormand-Prince', 1e-10, 1e-12)
                 else:
-                    tableau = ('RK45', 1e-3, 1e-6)
+                    tableau = ('RK45', 1e-10, 1e-12)
                 if tableau[0] in embedded_pairs:
+                    options = solver_options[k+1] if k+1 in solver_options else {}
                     tableau = (embedded_pairs[tableau[0]], tableau[1], tableau[2])
+                elif tableau[0] in ["CV_ADAMS", "CV_BDF"]:
+                    options = solver_options[k+1] if k+1 in solver_options else {}
+                    tableau = (CVODE(tableau[0], initial_y, function, initial_t, tableau[1], tableau[2], **options), tableau[1], tableau[2])
+                elif tableau[0] == 'IDA':
+                    options = solver_options[k+1] if k+1 in solver_options else {}
+                    tableau = (IDA(function, initial_y, tableau[1], tableau[2], initial_t, **options), tableau[1], tableau[2])
+                elif 'MRI' in tableau[0]:
+                    options = solver_options[k+1] if k+1 in solver_options else {}
+                    tableau = (MRIStep(initial_y, function[0], initial_t, tableau[1], tableau[2], function[1], delta_t, **options), tableau[1], tableau[2])
+                elif (tableau[0][0] is None or 'ARKODE' in tableau[0][0]) and (tableau[0][1] is None or 'ARKODE' in tableau[0][1]):
+                    options = solver_options[k+1] if k+1 in solver_options else {}
+                    tableau = (ARKStep(tableau[0], initial_y, function[0], function[1], initial_t, tableau[1], tableau[2], **options), tableau[1], tableau[2])
+                elif 'ARKODE' in tableau[0]:
+                    tableau = (ERKStep(tableau[0], initial_y, function, initial_t, tableau[1], tableau[2]), tableau[1], tableau[2])
 
-            if not isinstance(initial_y, Function):
-                if jacobian is not None:
-                    mask=np.logical_not(np.isnan(function(initial_t, initial_y, J))) #check if f(t_0,y_0) is defined
-                else:
-                    mask = np.logical_not(np.isnan(function(initial_t, initial_y)))
-            else:
-                mask = None
+            
             if isinstance(step, complex):
                 complex_flag=True
             if step!=0:
-                function_list.append((k, step * delta_t, function, tableau, mask, exact_flag, start_times[k]))
+                function_list.append((k, step * dt, function, tableau, exact_flag, start_times[k]))
             if isinstance(step, tuple):
                 if isinstance(start_times[k], tuple):
-                    start_times[k] = (start_times[k][0] + step[0] * delta_t, start_times[k][1] + step[1] * delta_t)
+                    start_times[k] = (start_times[k][0] + step[0] * dt, start_times[k][1] + step[1] * float(delta_t))
                 else:
-                    start_times[k] = (start_times[k] + step[0] * delta_t, start_times[k] + step[1] * delta_t)
+                    start_times[k] = (start_times[k] + step[0] * dt, start_times[k] + step[1] * dt)
             else:
-                start_times[k] += step * delta_t
-    return function_list, complex_flag, order
+                start_times[k] += step * dt
+    return function_list, complex_flag, order, k_factor
 
 
 def ave_Godunov_step(functions,initial_t,y,delta_t):
     tableau1=tableaus['FE']
     tableau2=tableaus['BE']
     
-    mask1=np.logical_not(np.isnan(functions[0](initial_t, y)))
-    mask2=np.logical_not(np.isnan(functions[1](initial_t, y)))
     y1=np.array(y)
-    y1=time_step(functions[0], delta_t, y1, initial_t, tableau1, mask1)
-    y1=time_step(functions[1], delta_t, y1, initial_t, tableau2, mask2)
+    y1=time_step(functions[0], delta_t, y1, initial_t, tableau1)
+    y1=time_step(functions[1], delta_t, y1, initial_t, tableau2)
 
     y2=np.array(y)
-    y2=time_step(functions[1], delta_t, y2, initial_t, tableau1, mask1)
-    y2=time_step(functions[0], delta_t, y2, initial_t, tableau2, mask2)
+    y2=time_step(functions[1], delta_t, y2, initial_t, tableau1)
+    y2=time_step(functions[0], delta_t, y2, initial_t, tableau2)
 
     return (y1+y2)/2
 
 def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t, 
-                             alpha, methods, b=None, fname=None, save_steps=0, ivp_methods={}, epi_options={}, os_tol = 1e-3, solver_parameters={}, jacobian=None, bc=None):
+                             alpha, methods, b=None, fname=None, save_steps=0, ivp_methods={}, epi_options={}, os_rtol = 1e-3, os_atol = 1e-6, solver_parameters={}, jacobian=None, bc=None, stats=False):
     y=initial_y
     #process it
-    function_list, complex_flag, order = process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods, b, ivp_methods, epi_options, jacobian)
+    function_list, complex_flag, order, k_factor = process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods, b, ivp_methods, epi_options, jacobian, solver_parameters)
     if complex_flag and not isinstance(initial_y, Function):
         y=np.array(initial_y, np.complex128)
 
@@ -221,6 +282,16 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
             t = complex(t)
         else:
             t = float(t)
+    elif isinstance(t, Function):
+        t = t.dat.data[0]
+    if isinstance(delta_t, Function):
+        delta_t = delta_t.dat.data[0]
+    elif isinstance(delta_t, Constant):
+        delta_t = delta_t.values()[0]
+        if isinstance(delta_t, np.complex128):
+            delta_t = complex(delta_t)
+        else:
+            delta_t = float(delta_t)
     if fname is not None:
         if isinstance(initial_y, Function):
             f = CheckpointFile(fname, 'w')
@@ -239,12 +310,16 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
     else:
         save_interval = delta_t
 
-    tic = timeos.perf_counter()
+
     scale = 1
     i = 0
     if order is not None:
         scale = delta_t
-    
+
+    accepted_steps = 0
+    total_steps = 0
+
+    tic = timeos.perf_counter()
     while abs(t - final_t) > 1e-8:
         if (t + delta_t - final_t).real > 0:
             delta_tn = final_t - t
@@ -261,28 +336,36 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
                 y1 = y
         else:
             y1 = y
+        #split flag is used to seperate the data for an error estimator
         split = False
+        if order is not None and abs(delta_t) < 1e-10:
+            if isinstance(y, Function):
+                return y.assign(np.nan)
+            return y * np.nan
         if jacobian is not None:
             J = jacobian(t, y)
+        else:
+            J = None
         for line in function_list:
-            (k, step, function_i, tableau, mask, exact_flag, start_time)=line     # Here, if exact solution needed, use y=exact_solution(), if RK method needed use y=time_step() (as indicated by exact_flag)
+            (k, step, function_i, tableau, exact_flag, start_time)=line     # Here, if exact solution needed, use y=exact_solution(), if RK method needed use y=time_step() (as indicated by exact_flag)
             if not isinstance(initial_y, Function) and jacobian is not None:
                 function = lambda t, y: function_i(t, y, J)
             else:
                 function = function_i
             if isinstance(step, tuple):
-                if not split:
-                    if isinstance(initial_y, Function):
+                if isinstance(initial_y, Function):
+                    if not split:
                         y2 = Function(y1)
-                        if isinstance(function, Form):
-                            function2 = replace(function, {y: y2})
-                        elif len(function) == 2:
-                            function2 = (replace(function[0], {y: y2}), function[1])
-                        else:
-                            function2 = (replace(function[0], {y: y2}), function[1], function[2])
+                    if isinstance(function, Form):
+                        function2 = replace(function, {y: y2})
+                    elif len(function) == 2:
+                        function2 = (replace(function[0], {y: y2}), function[1])
                     else:
+                        function2 = (replace(function[0], {y: y2}), function[1], function[2])
+                else:
+                    if not split:
                         y2 = np.array(y1)
-                        function2 = function
+                    function2 = function
                 split = True
                 step2 = step[1] * scale
                 step = step[0]
@@ -298,9 +381,12 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
             if isinstance(initial_t, Constant):
                 initial_t.assign(ti)
                 ti = initial_t
+            elif isinstance(initial_t, Function):
+                initial_t.assign(ti)
+                ti = initial_t
             #Calculate y for each step, taking y from previous step as initial condition
             if (k+1,) in methods and methods[(k+1,)] == 'ANALYTIC':
-                y1 = time_step_analytic(function, step, y1, ti, mask)
+                y1 = time_step_analytic(function, step, y1, ti)
                 if split:
                     if isinstance(initial_t, Constant):
                         t0 = Constant(initial_t)
@@ -312,7 +398,7 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
                         params = solver_parameters[k+1]
                     else:
                         params = None
-                    y2 = time_step_analytic(function2, step2, y2, ti, mask, params = params)
+                    y2 = time_step_analytic(function2, step2, y2, ti, params = params)
                     if isinstance(initial_t, Constant):
                         initial_t.assign(t0)
             elif exact_flag:
@@ -321,8 +407,8 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
                     params = solver_parameters[k+1]
                 else:
                     params = None
-                y1 = exact_solution(function, ti, step, y1, ivp_method, mask,
-                                    rtol, atol, params=params)
+                y1 = exact_solution(function, ti, step, y1, ivp_method, 
+                                    rtol, atol, J = J, params=params)
                 if split:
                     if isinstance(initial_t, Constant):
                         t0 = Constant(initial_t)
@@ -331,16 +417,16 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
                         
                     else:
                         ti = t + start_time2
-                    y2 = exact_solution(function2, ti, step2, y2, ivp_method, mask,
-                                        rtol, atol, params=params)
+                    y2 = exact_solution(function2, ti, step2, y2, ivp_method, 
+                                        rtol, atol, J = J, params=params)
                     if isinstance(initial_t, Constant):
                         initial_t.assign(t0)
             else:
                 if k+1 in solver_parameters:
                     params = solver_parameters[k+1]
                 else:
-                    params = None
-                y1=time_step(function, step, y1, ti, tableau, mask, params = params)
+                    params = {}
+                y1=time_step(function, step, y1, ti, tableau, **params)
                 if split:
                     if isinstance(initial_t, Constant):
                         t0 = Constant(initial_t)
@@ -348,24 +434,37 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
                         ti = initial_t
                     else:
                         ti = t + start_time2
-                    y2 = time_step(function2, step2, y2, ti, tableau, mask, params=params)
+                    
+                    y2 = time_step(function2, step2, y2, ti, tableau, params=params, restore=True)
+                    
                     if isinstance(initial_t, Constant):
                         initial_t.assign(t0)
+            if order is not None:
+                if not isinstance(y1, Function) and not np.all(np.isfinite(y1)):
+                    break
+
         if bc is not None:
             bc.apply(y1)
         if order is not None:
-            accept, err = measure_error(y, y1, y2, os_tol)
+            try:
+                accept, err = measure_error(y, y1, y2, os_rtol, os_atol, k_factor=k_factor)
+            except:
+                accept = False
+                err = np.nan
         else:
             accept = True
+        if stats:
+            total_steps += 1
+            accepted_steps += accept
         if accept:
             t += delta_t
             y = y1
         elif isinstance(y, Function):
             y.assign(ys)
         if order is not None:
-            delta_t = compute_time(err, order, delta_t, os_tol)
+            delta_t = compute_time(err, order, delta_t)
             scale = delta_t
-        if fname is not None and t - saved - save_interval > -1e-8:
+        if fname is not None and ((save_steps == 0 and accept) or t - saved - save_interval > -1e-8):
             if isinstance(initial_y, Function):
                 f.save_function(y, idx=count_save)
                 f.set_attr('/times', str(count_save), t)
@@ -380,8 +479,16 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
 
 
     toc = timeos.perf_counter()
-    print(f"{toc - tic:0.4f}")
+    for line in function_list:
+        if isinstance(line[3], tuple) and isinstance(line[3][0], SundialsSolver):
+            line[3][0].free()
+        elif isinstance(line[3], tuple) and isinstance(line[3][1], tuple) and isinstance(line[3][1][0], SundialsExode):
+            line[3][1][0].free()
     
+    if stats:
+        true_count = accepted_delta_t.count(False)
+        print("Number of rejected steps:", total_steps-accepted_steps)
+        print("Number of steps accepted:", accepted_steps)
 
     if fname is not None:
         f.close()
@@ -390,8 +497,8 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
 def operator_splitting(
         functions, delta_t, initial_y, initial_t, final_t, alpha,
         methods={},b=None, fname=None, save_steps=0, ivp_methods={},
-        epi_options={}, os_tol = 1e-3, solver_parameters={}, jacobian=None,
-        bc=None):
+        epi_options={}, os_rtol = 1e-3, os_atol = 1e-6, solver_parameters={}, jacobian=None,
+        bc=None, stats=False):
     """
     This function uses operator splitting with n functions
     to approximate a differential equation
@@ -472,8 +579,7 @@ def operator_splitting(
         y=operator_splitting_inner(functions, delta_t, initial_y, initial_t, 
                                    final_t, alpha, methods,b, 
                                    fname, save_steps, ivp_methods, epi_options,
-                                   os_tol, solver_parameters, jacobian, bc)
-
+                                   os_rtol, os_atol, solver_parameters, jacobian, bc, stats)
     if not isinstance(y, Function) and np.all(np.isreal(y)):
         y=y.real
     if not isinstance(y, Function) and np.size(y)==1:
@@ -500,6 +606,7 @@ def alphas_repo(alpha,b, N):
     """
     alphas={}
     embedded_methods = {}
+    error_factor = {}
     alphas['Godunov']=[[1, 1]]
     alphas['Godunov-3']=[[1,1,1]]
     alphas['SM2']=[[0.5, 0.5],
@@ -659,6 +766,13 @@ def alphas_repo(alpha,b, N):
                                    [0.693024453679147, 0.278524736976327,    0.278524736976327]] # This is a 3-stage
                                   # 2nd-order 3 splitting method with 7 operations and smalled LEM among 7op OS32
 
+    # 3 splitting real coefficient OS
+    alphas['PP3_4A-3'] = [[0.461601939364879971,  -0.266589223588183997, -0.360420727960349671],
+                        [-0.0678710530507800810, 0.0924576733143338350, 0.579154058410941403],
+                        [-0.0958868852260720250, 0.674131550273850162,  0.483422668461380403],
+                        [0.483422668461380403,   0.674131550273850162, -0.0958868852260720250],
+                        [0.579154058410941403,   0.0924576733143338350,-0.0678710530507800810],
+                        [-0.360420727960349671, -0.266589223588183997,  0.461601939364879971]]
 
     # 3 splitting complex coefficient OS
     alphas['AKT22_C'] = [[0.5 + 0.5j, 0.5 + 0.5j, 0.5 + 0.5j],
@@ -669,8 +783,35 @@ def alphas_repo(alpha,b, N):
                         [0.059274548196998816+0.354231218126596507j, 0.223397823699529381+0.205816527716212534j, 0.260637333463417766+0.07744172526769638060j],
                         [0.353043498499040389+0.0768951336684972038j, 0.179226865237094561-0.0934263750859694960j, 0.157419072651724312-0.1552628290245811054j],
                         [0.125415464915697242-0.281916718734615225j, 0.0973753110633760580-0.112390152630243038j, 0.0442100822731214750-0.0713885293035937610j]]
+    Y4gamma1 = 1 / (2 - 2 ** (1 / 3))
+    Y4gamma2 = 1 - 2 * Y4gamma1
+    Y4gamma3 = Y4gamma1
+    alphas['Yoshida-3'] = [[Y4gamma1 / 2., Y4gamma1 / 2., Y4gamma1],
+                           [0, Y4gamma1 / 2., 0],
+                           [(Y4gamma1 + Y4gamma2) / 2., Y4gamma2 / 2., Y4gamma2],
+                           [0, Y4gamma2 / 2., 0],
+                           [(Y4gamma1 + Y4gamma2) / 2., Y4gamma1 / 2., Y4gamma1],
+                           [0,  Y4gamma1 / 2., 0],
+                           [Y4gamma1 / 2., 0, 0]]
+    # 4 splitting complex coefficient OS
+    alphas['OSN4S2P2'] = [[0.5 + 0.5j, 0.5 + 0.5j, 0.5 + 0.5j, 0.5 + 0.5j],
+                         [0.5 - 0.5j, 0.5 - 0.5j, 0.5 - 0.5j, 0.5 - 0.5j]]
+    alphas['OSN4S2P2_conj'] = [[0.5 - 0.5j, 0.5 - 0.5j, 0.5 - 0.5j, 0.5 - 0.5j],
+                               [0.5 + 0.5j, 0.5 + 0.5j, 0.5 + 0.5j, 0.5 + 0.5j]]
+    Y4gamma1 = 1 / (2 - 2 ** (1 / 3))
+    Y4gamma2 = 1 - 2 * Y4gamma1
+    Y4gamma3 = Y4gamma1
+    alphas['Yoshida-4'] = [[Y4gamma1 / 2., Y4gamma1 / 2., Y4gamma1 / 2., Y4gamma1],
+                           [0, 0,Y4gamma1 / 2., 0],
+                           [0, Y4gamma1 / 2., 0, 0],
+                           [(Y4gamma1 + Y4gamma2) / 2., Y4gamma2 / 2., Y4gamma2 / 2.,  Y4gamma2],
+                           [0, 0, Y4gamma2 / 2., 0],
+                           [0, Y4gamma2 / 2., 0, 0],
+                           [(Y4gamma1 + Y4gamma2) / 2.,  Y4gamma1 / 2., Y4gamma1 / 2., Y4gamma1],
+                           [0, 0, Y4gamma1 / 2., 0],
+                           [0, Y4gamma1 / 2., 0, 0],
+                           [Y4gamma1 / 2., 0, 0, 0]]
 
-    
     # 5 splitting complex coefficient OS
     alphas['Godunov-5'] = [[1, 1, 1, 1, 1]]
     alphas['Strang-5'] = [[0.5, 0.5, 0.5, 0.5, 1],
@@ -716,7 +857,10 @@ def alphas_repo(alpha,b, N):
             a2 = (2.*a3*b3-2.*a3+1)/(2.*b1)
             a1 = 1-a2-a3
             alphas['OS33bv1'] = [[a1,b1],[a2,b2],[a3,b3]]
-
+    alphas['OS43(7)'] = [[0, .188740057347444],
+                         [.819436020634102, -.091333804743738],
+                         [-.269688870700662, .727927736247005],
+                         [.450252850066561, .174666011149290]]
 
     if alpha == 'OS33bv2':
         if b == None or b == 0.25 or b == 1 or b == 1.0/3.0:   # terminate for unusable b values
@@ -731,22 +875,57 @@ def alphas_repo(alpha,b, N):
             a2 = (2.*a3*b3-2.*a3+1)/(2.*b1)
             a1 = 1-a2-a3
             alphas['OS33bv2'] = [[a1,b1],[a2,b2],[a3,b3]]
-            #print(alphas['OS33bv2'])
 
     alphas['Emb3/2Ra'] = [[1, -1/24], [(-2/3, -12/25), (3/4, 25/24)], [(2/3, 12/25), (7/24, 0)]]
     embedded_methods['Emb3/2Ra'] = 2
 
+    alphas['Strang-Milne'] = [[(1/2, 1/4), (1, 1/2)], [(1/2, 1/2), (0, 1/2)],[(0, 1/4),(0, 0)]]
+    embedded_methods['Strang-Milne'] = 2
+    error_factor['Strang-Milne'] = 4/3
+    
+    alphas['PP_1/2_s'] = [[(1, 0), (1, 1)], [(0, 1), (0, 0)]]
+    embedded_methods['PP_1/2_s'] = 1
+    error_factor['PP_1/2_s'] = 1/2
+
     alphas['Godunov-N'] = [[1] * N]
     alphas['Strang-N'] = [ [ 0.5] * (N - 1) + [1],
                            [0.5] * (N - 1) + [0, True]]
-    
+    alphas['OSNNS2P2-N'] = [[0.5+0.5j]*N,
+                            [0.5-0.5j]*N]
+    # Derived from Hansen Osterman 2009 Thm 2.2
+    sigma1 = 0.5 + m.sin(m.pi/3)/(2+2*m.cos(m.pi/3))*1j
+    sigma2 = 1-sigma1
+    alphas['OSNNS4P3-N'] = [[sigma1/2+sigma1/2j]*N,
+                            [sigma1/2-sigma1/2j]*N,
+                            [sigma2/2 + sigma2/2j] * N,
+                            [sigma2/2 - sigma2/2j] * N]
+    alphas['OSNNS2P2-N-conj'] = [[0.5 - 0.5j] * N,
+                                [0.5 + 0.5j] * N]
+    alphas['OSNNS6P3-N'] = [[0.5* Y4gamma1 + 0.5j* Y4gamma1] * N,
+                            [0.5* Y4gamma1 - 0.5j* Y4gamma1] * N ,
+                            [0.5 * Y4gamma2+ 0.5j* Y4gamma2] * N ,
+                            [0.5 * Y4gamma2- 0.5j* Y4gamma2] * N ,
+                            [0.5 * Y4gamma3+ 0.5j* Y4gamma3] * N,
+                            [0.5* Y4gamma3 - 0.5j* Y4gamma3] * N]
+    alphas['OSNNS6P3-N-conj'] = [[0.5* Y4gamma1 - 0.5j* Y4gamma1] * N,
+                                 [0.5* Y4gamma1 + 0.5j* Y4gamma1] * N,
+                                 [0.5* Y4gamma2 - 0.5j* Y4gamma2] * N,
+                                 [0.5* Y4gamma2 + 0.5j* Y4gamma2] * N,
+                                 [0.5* Y4gamma3 - 0.5j* Y4gamma3] * N,
+                                 [0.5* Y4gamma3 + 0.5j* Y4gamma3] * N]
     
     order = None
+    k_factor = None
     if isinstance(alpha, str) and alpha in alphas: 
         os_scheme = alphas[alpha] # matching OS method name with coefficients
+    elif isinstance(alpha, list):
+        os_scheme = alpha
     if isinstance(alpha, str) and alpha in embedded_methods:
         order = embedded_methods[alpha]
-    return os_scheme, order
+    if isinstance(alpha, str) and alpha in error_factor:
+        k_factor = error_factor[alpha]
+    
+    return os_scheme, order, k_factor
 
 
 

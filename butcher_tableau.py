@@ -5,7 +5,7 @@ from scipy.sparse.linalg.dsolve import linsolve
 from scipy.optimize import root
 import timeit
 try:
-    from firedrake import Constant, Function, solve, replace, inner, TestFunction, split, dx, errornorm, DirichletBC
+    from firedrake import Constant, Function, solve, replace, inner, TestFunction, split, dx, errornorm, DirichletBC, norm, Form
 except:
     fem = False
     Function = type(None)
@@ -43,7 +43,7 @@ class Tableau:
         return next
     
     def get_k_implicit(self, function, current_y, current_x,
-                              step, mask):
+                              step, **kwargs):
         """Return the k values (slopes) for the next step of the solution
            for an implicit Runge--Kutta method"""
         Y = np.zeros((current_y.size, self._sizeb), current_y.dtype)
@@ -55,8 +55,10 @@ class Tableau:
         # scipy.optimize.roots cannot handle complex numbers, so if the input is complex, interpret each complex number as two floating points
         if current_y.dtype == np.complex128:
             y0 = y0.view(np.float64)
-        
-        sol = root(implicit_root_func, y0, args=(current_x, current_y, function, step, mask, self), method='krylov')
+
+        if 'method' not in kwargs:
+            kwargs['method'] = 'krylov'
+        sol = root(implicit_root_func, y0, args=(current_x, current_y, function, step, self), **kwargs)
         if not sol.success:
             print(sol.message)
             print(np.max(abs(sol.fun)))
@@ -74,10 +76,13 @@ class Tableau:
 
         return k_i
 
-    def get_k_values_sdirk(self, function, current_y, current_x, step, mask):
+    def get_k_values_sdirk(self, function, current_y, current_x, step, **kwargs):
 
         k=np.zeros((np.size(current_y), self._sizeb), current_y.dtype)
         x=step*self._c+current_x
+        if 'method' not in kwargs:
+            kwargs['method'] = 'krylov'
+
         for i in range(self._sizeb):
 
             y0 = current_y
@@ -86,7 +91,7 @@ class Tableau:
             if current_y.dtype == np.complex128:
                 y0 = y0.view(np.float64)
 
-            sol = root(dirk_root_function, y0, args = (current_x, current_y, function, step, k, i, mask, self), method='krylov')
+            sol = root(dirk_root_function, y0, args = (current_x, current_y, function, step, k, i, self), **kwargs)
             sol_x = sol.x
             
             if not sol.success:
@@ -100,23 +105,27 @@ class Tableau:
             k[:,i]=function(x[i], sol_x)
         return k
 
-    def get_k_values(self, function, current_y, current_x, step, mask, bc=None, params=None):
+    def get_k_values(self, function, current_y, current_x, step, bc=None, params=None):
         """Return the k values (slopes) for the next step of the solution"""
         if isinstance(function, tuple) or isinstance(current_y, Function):
             if isinstance(function, tuple):
                 f = function[0]
                 test_f = f.arguments()[0]
                 if len(function) == 2:
-                    if isinstance(function[1], DirichletBC):
+                    if isinstance(function[1], DirichletBC) or isinstance(function[1], list):
                         bcs = function[1]
                     else:
                         f = function
                 else:
                     bcs = function[1]
                     f = (function[0], function[2])
-            else:
+            elif isinstance(function, Form):
                 f = function
                 test_f = function.arguments()[0]
+                bcs = bc
+            else:
+                f = function
+                test_f = None
                 bcs = bc
             y_s = Function(current_y)
             M = 1
@@ -137,35 +146,44 @@ class Tableau:
         if self._explicit:
             return self.get_k_values_explicit(function, current_y, current_x,step)
         elif self._sdirk:
-            return self.get_k_values_sdirk(function, current_y, current_x, step, mask)
+            return self.get_k_values_sdirk(function, current_y, current_x, step)
         else:
-            return self.get_k_implicit(function, current_y, current_x, step, mask)
+            return self.get_k_implicit(function, current_y, current_x, step)
 
-    def k_erk_fem(self, F, y0, t, dt, test_f, bcs=None, params=None):
+
+    def k_erk_fem(self, F, y0, t, dt, test_f, bcs=None, params={}):
         ki = [None for _ in range(self._sizeb)]
         t_0 = Constant(t)
         for i in range(self._sizeb):
             ki[i] = Function(y0)
-            F2 = inner(ki[i], test_f) * dx - F
             yi = Function(y0)
             t.assign(t_0 + dt * self._c[i])
             for j in range(i):
                 if self._a[i,j] != 0:
-                    yi  += dt * float(self._a[i,j]) * ki[j]
-            if bcs is not None:
-                bcs.apply(yi)
-            solve(replace(F2, {y0: yi}) == 0, ki[i])
+                    yi += float(self._a[i,j]) * ki[j] * dt
+            
+            if isinstance(F, Form):
+                F2 = inner(ki[i], test_f) * dx - F
+
+                #if bcs is not None:
+                #    bcs.apply(yi)
+                solve(replace(F2, {y0: yi}) == 0,  ki[i],
+                      bcs=bcs,
+                      solver_parameters=params)
+            else:
+                ki[i] = F(t, yi)
         t.assign(t_0)
         return ki
     
-    def k_dirk_fem(self, F, y0, t, dt, test_f, bcs=None, params=None, M = 1):
+    def k_dirk_fem(self, F, y0, t, dt, test_f, bcs=None, M = 1, params={}):
         ki = [None for _ in range(self._sizeb)]
         t0 = Constant(t)
         y_s = Function(y0)
         for i in range(self._sizeb):
             yi = Function(y_s)
             for j in range(i):
-                yi += dt * float(self._a[i,j]) * ki[j]
+                if self._a[i,j] != 0:
+                    yi += dt * float(self._a[i,j]) * ki[j]
             F2 = inner((y0 - yi) / (dt * float(self._a[i,i])), M * test_f) * dx - F
             t.assign(dt * self._c[i] + t0)
             solve(F2 == 0, y0, bcs=bcs, solver_parameters=params)
@@ -178,7 +196,7 @@ class Tableau:
         t.assign(t0)
         return ki
 
-    def k_irk_fem(self, F, y0, t, dt, test_f, bcs=None, params=None, M = 1):
+    def k_irk_fem(self, F, y0, t, dt, test_f, bcs=None, M = 1, params={}):
         Vbig = y0.function_space()
         N = len(y0.function_space())
         for i in range(1, self._sizeb):
@@ -231,7 +249,10 @@ class Tableau:
                         Vbi = lambda i: Vbig[s + N * i]
                 for j in range(self._sizeb):
                     t.assign(t0 + dt * self._c[j])
-                    new_bcs.append(DirichletBC(Vbi(j), bc.function_arg.copy(deepcopy=True), bc.sub_domain))
+                    if bc.function_arg != 0:
+                        new_bcs.append(DirichletBC(Vbi(j), bc.function_arg.copy(deepcopy=True), bc.sub_domain))
+                    else:
+                        new_bcs.append(DirichletBC(Vbi(j), 0, bc.sub_domain))
         solve(Fnew == 0, yis, bcs=new_bcs, solver_parameters=params)
         y_out = []
 
@@ -260,7 +281,7 @@ class Tableau:
         t.assign(t0)
         return kis
 
-    def step_fem(self, F, y0, t, dt, bcs=None, params=None):
+    def step_fem(self, F, y0, t, dt, bcs=None, **params):
         y_s = Function(y0)
         M = 1
         g = None
@@ -270,23 +291,28 @@ class Tableau:
             M = F[1][0]
             g = F[1][1]
             F = F[0]
-        test_f = F.arguments()[0]
+        if isinstance(F, Form):
+            test_f = F.arguments()[0]
+        else:
+            test_f = None
         if self._explicit:
             ki = self.k_erk_fem(F, y0, t, dt, test_f, bcs, params)
         elif self._sdirk:
-            ki = self.k_dirk_fem(F, y0, t, dt, test_f, bcs, params, M = M)
+            ki = self.k_dirk_fem(F, y0, t, dt, test_f, bcs, M, params)
         else:
-            ki = self.k_irk_fem(F, y0, t, dt, test_f, bcs, params, M = M)
+            ki = self.k_irk_fem(F, y0, t, dt, test_f, bcs, M, params)
         y0.assign(y_s)
         for i in range(self._sizeb):
             y_s += ki[i] * float(self._b[i])
+        #if self._explicit:
+            #if bcs is not None:
+            #    bcs.apply(y_s)
         y_s.assign(y_s - y0)
         
         return y_s
 
-    def y_step(self, function, current_y, current_x, step, mask, **kwargs):
-        """Return the adjustment on y for the next step
-           mask is a boolean array of where the function returns non-nan values"""
+    def y_step(self, function, current_y, current_x, step, **kwargs):
+        """Return the adjustment on y for the next step"""
         if isinstance(function, tuple) or isinstance(current_y, Function):
             if isinstance(function, tuple):
                 if len(function) == 3:
@@ -300,9 +326,9 @@ class Tableau:
         if self._explicit:
             return np.dot(self.get_k_values_explicit(function, current_y, current_x, step), self._b)
         elif self._sdirk:
-            return np.dot(self.get_k_values_sdirk(function, current_y, current_x, step, mask), self._b)
+            return np.dot(self.get_k_values_sdirk(function, current_y, current_x, step,  **kwargs), self._b)
         else:
-            return np.dot(self.get_k_implicit(function, current_y, current_x, step, mask), self._b)
+            return np.dot(self.get_k_implicit(function, current_y, current_x, step, **kwargs), self._b)
 
 
 class EmbeddedTableau(Tableau):
@@ -314,27 +340,33 @@ class EmbeddedTableau(Tableau):
         self.b_aux = b_aux
         self.order = order
     
-    def y_step(self, function, current_y, current_x, step, mask=None, tol=1e-3, **kwargs):
+    def y_step(self, function, current_y, current_x, step, rtol=1e-3, atol=1e-6, **kwargs):
         """ Returns the value of y after time step step.
         Step size is controlled to get a solution that meets the tolerance. """
         dt = 0
         tn = step
         while abs(dt - step) > 1e-8:
+            if abs(tn) < 1e-10:
+                if isinstance(current_y, Function):
+                    return current_y.assign(np.nan)
+                return current_y * np.nan
             if abs(dt + tn) > abs(step):
                 tn = step - dt
             fem = False
-            k = self.get_k_values(function, current_y, current_x, tn, mask, **kwargs)
+            k = self.get_k_values(function, current_y, current_x, tn, **kwargs)
             if isinstance(k, list):
                 fem = True
                 y1 = Function(current_y)
                 y2 = Function(current_y)
                 for i in range(self._sizeb):
-                    y1.assign( y1 + tn * float(self._b[i]) * k[i])
-                    y2.assign( y2+  tn * float(self.b_aux[i]) * k[i])
+                    if self._b[i] != 0:
+                        y1 += k[i] * tn * float(self._b[i])
+                    if self.b_aux[i] != 0:
+                        y2 += k[i] * tn * float(self.b_aux[i])
             else:
                 y1 = current_y + tn * np.dot(k, self._b)
                 y2 = current_y + tn * np.dot(k, self.b_aux)
-            accept, err = measure_error(current_y, y1, y2, tol)
+            accept, err = measure_error(current_y, y1, y2, rtol, atol)
             
             if accept:
                 dt += tn
@@ -344,13 +376,13 @@ class EmbeddedTableau(Tableau):
                 else:
                     current_y = y2
                     current_x += tn
-            tn = compute_time(err, self.order, tn, tol)
+            tn = compute_time(err, self.order, tn)
         return current_y
 
 
 
 
-def implicit_root_func(Y, current_x, current_y, function, step, mask, tableau):
+def implicit_root_func(Y, current_x, current_y, function, step, tableau):
     """ Function used for determining k_i in the fully implicit methods.  
         This wraps the equation to solve with the logic to interpret complex numbers as two floating point numbers if necessary and to ignore elements where the function returns nan"""
     if current_y.dtype == np.complex128:
@@ -360,7 +392,7 @@ def implicit_root_func(Y, current_x, current_y, function, step, mask, tableau):
     
     for i in range(tableau._b.size):
         for j in range(tableau._b.size):
-            R[mask,i] -= step * tableau._a[i,j] * function(current_x + step * tableau._c[j], Y[:,j])[mask]
+            R[:,i] -= step * tableau._a[i,j] * function(current_x + step * tableau._c[j], Y[:,j])
         R[:,i] -= current_y
     R = R.flatten(order='F')
     if current_y.dtype == np.complex128:
@@ -368,13 +400,13 @@ def implicit_root_func(Y, current_x, current_y, function, step, mask, tableau):
     return R
     
     
-def dirk_root_function(Y, current_x, current_y, function, step, k_i, i, mask, tableau):
+def dirk_root_function(Y, current_x, current_y, function, step, k_i, i, tableau):
     """ Function used for determining Y_i in the SDIRK methods.  
         This wraps the equation to solve with the logic to interpret complex numbers as two floating point numbers if necessary and to ignore elements where the function returns nan"""
     if current_y.dtype == np.complex128:
         Y = Y.view(np.complex128)
     R = np.array(Y)
-    R[mask] -= step * np.dot(k_i, tableau._a[i])[mask] + step * tableau._a[i,i] * function(current_x + step * tableau._c[i], Y)[mask]
+    R -= step * np.dot(k_i, tableau._a[i]) + step * tableau._a[i,i] * function(current_x + step * tableau._c[i], Y)
     R -= current_y
 
     if current_y.dtype == np.complex128:
@@ -395,27 +427,54 @@ def constant_matrix(function, current_y, time):
         y[i]-=1
     return a.tocsr()
 
+def create_error_function(sol_1, sol_2, rel_tol, abs_tol, k_factor):
+    if sol_1.ufl_shape == ():
+        return Function(sol_1).interpolate(k_factor * (sol_1 - sol_2) / (abs(sol_1) * rel_tol+ abs_tol))
+    if len(split(sol_1)) == 1:
+        try:
+            return Function(sol_1).interpolate(k_factor * (sol_1 - sol_2) * (abs(sol_1) * rel_tol + abs_tol) ** -1)
+        except:
+            return Function(sol_1).interpolate(k_factor * (sol_1 - sol_2) / norm((abs(sol_1) * rel_tol + abs_tol)))
+    out = Function(sol_1)
 
+
+    N = len(split(sol_1))
+    for i in range(N):
+        out.sub(i).assign(create_error_function(sol_1.sub(i), sol_2.sub(i), rel_tol, abs_tol.sub(i), k_factor))
+    return out
 
 # utilities for embedded methods
-
-def measure_error(y, sol_1, sol_2, tol):
+def measure_error(y, sol_1, sol_2, rel_tol, abs_tol, k_factor=1):
+    # tolerance is defined as rtol * sol_1 + atol
+    # k_factor is used for palindromic or Milne methods
+    if k_factor is None:
+        k_factor = 1
+    
     if isinstance(y, Function):
-        err = float(abs(errornorm(sol_1, sol_2)))
-    else:
-        err = sum(abs(sol_1 - sol_2) ** 2 / y.size) ** 0.5
-    return (err < tol), err
+        if not isinstance(abs_tol, Function):
+            abs_tol = Function(y).assign(rel_tol)
+        E = create_error_function(sol_1, sol_2, rel_tol, abs_tol, k_factor)
+        err = norm(E)
+        return err < 1, err
+    if isinstance(abs_tol, (int, float)):
+        abs_tol = np.full_like(sol_1, abs_tol)
+    assert len(abs_tol) == len(sol_1), "Error should have same length as solution"
+    tol = rel_tol * abs(sol_1) + abs_tol
+    err = (sol_1-sol_2)
+    if k_factor is not None:
+        err = k_factor*err
+    return np.all(abs(err) < abs(tol)), np.linalg.norm(err/tol)
 
-def compute_time(err, order, tn, tol):
+
+def compute_time(err, order, tn):
     a_min = 0.2
     a_max = 5
     a = 0.9
     if err == 0:
         tn = tn * a_max
     else:
-        tn = tn * min(a_max, max(a_min, a * (tol / err)**(1/(order+1))))
+        tn = tn * min(a_max, max(a_min, a * (1 / err)**(1/(order+1))))
     return tn
-
 
 tableaus={'FE': Tableau(np.array([0]), np.array([[0]]), np.array([1]),explicit=True),
           'RK4': Tableau(np.array([0, 0.5, 0.5, 1]),
@@ -462,7 +521,6 @@ tableaus={'FE': Tableau(np.array([0]), np.array([[0]]), np.array([1]),explicit=T
                               np.array([0.14681187618661, 0.24848290924556,
                                         0.10425883036650, 0.27443890091960,
                                         0.22600748319395]), explicit=True),
-#          'EXACT': Tableau(np.array([0]), np.array([[0]]), np.array([1]),explicit=True),   ## "tableaus" for using exact value, with all k-entries = 0
           'SSPRK3': Tableau(np.array([0,1.,0.5]),
                          np.array([[0,0,0],[1.,0,0],[1./4,1./4,0]]),
                          np.array([1./6,1./6,2./3]),explicit=True),
@@ -532,7 +590,7 @@ embedded_pairs = {
         'Fehlberg': EmbeddedTableau(np.array([0,1/4,3/8,12/13,1,1/2]), np.array([[0,0,0,0,0,0],[1/4,0,0,0,0,0], [3/32, 9/32, 0,0,0,0], [1932/2197, -7200/2197, 7296/2197, 0,0,0], [439/216, -8, 3680/513, -845/4104, 0,0], [-8/27, 2, -3544/2565, 1859/4104, -11/40, 0]]), np.array([16/135, 0, 6656/12825, 28561/56430,-9/50, 2/55]), np.array([25/216, 0, 1408/2565,2197/4104, -1/5, 0]), 4),
         'Cash-Karp': EmbeddedTableau(np.array([0,1/5,3/10,3/5,1,7/8]), np.array([[0,0,0,0,0,0],[1/5,0,0,0,0,0], [3/40,9/40,0,0,0,0],[3/10,-9/10,6/5,0,0,0],[-11/54,5/2,-70/27,35/27,0,0],[1631/55296,175/512,575/13824,44275/110592,253/4096,0]]), np.array([37/378,0,250/621,125/594,0,512/1771]), np.array([2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4]), 4),
         'Dormand-Prince': EmbeddedTableau(np.array([0,1/5,3/10,4/5,8/9,1,1]), np.array([[0,0,0,0,0,0,0],[1/5,0,0,0,0,0,0],[3/40,9/40,0,0,0,0,0],[44/45,-56/15,32/9,0,0,0,0],[19372/6561, -25360/2187, 64448/6561, -212/729, 0,0,0], [9017/3168,-355/33,46732/5247,49/176,-5103/18656,0,0], [35/384,0,500/1113, 125/192, -2187/6784,11/84, 0]]), np.array([35/384,0,500/1113,125/192,-2187/6784,11/84,0]), np.array([5179/57600,0,7571/16695,393/640,-92097/339200,187/2100,1/40]), 4)
-    
-         }
+        #'MERSON4': EmbeddedTableau()
+}
 
 
