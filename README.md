@@ -159,15 +159,15 @@ Optional arguments are:
 
 - fname: a filename to save intermediate results to.  
   
-	  When using the finite element capabilities of firedrake this is a 
-	  .h5 file accessible through the `CheckpointFile` interface from 
-	  firedrake. Otherwise this is a .csv file containing time in the 
-	  first entry of each line, and the solution in the remaining entries
+	 When using the finite element capabilities of firedrake this is a 
+	 .h5 file accessible through the `CheckpointFile` interface from 
+	 firedrake. Otherwise this is a .csv file containing time in the 
+	 first entry of each line, and the solution in the remaining entries
 
 - save\_steps: the number of intermediate steps to save.  
   
-	  The default is to save steps at delta\_t time interval if a filename
-	  is provided.
+	 The default is to save steps at delta\_t time interval if a filename
+	 is provided.
 
 - ivp\_methods: a dictionary to control the selection of the EXACT solver. 
   
@@ -280,15 +280,15 @@ Optional arguments are:
 
 - fname: a filename to save intermediate results to.  
   
-	  When using the finite element capabilities of firedrake this is a 
-	  .h5 file accessible through the `CheckpointFile` interface from 
-	  firedrake. Otherwise this is a .csv file containing time in the 
-	  first entry of each line, and the solution in the remaining entries
+	 When using the finite element capabilities of firedrake this is a 
+	 .h5 file accessible through the `CheckpointFile` interface from 
+	 firedrake. Otherwise this is a .csv file containing time in the 
+	 first entry of each line, and the solution in the remaining entries
 
 - save\_steps: the number of intermediate steps to save.  
   
-	  The default is to save steps at delta\_t time interval if a filename
-	  is provided.
+	 The default is to save steps at delta\_t time interval if a filename
+	 is provided.
 
 - rtol: The relative tolerance to use if all supplied tableau are `EmbeddedTableau`
 - atol: The abolute tolerance to use if all supplied tableau are `EmbeddedTableau`
@@ -347,15 +347,15 @@ Optional arguments are:
 
 - fname: a filename to save intermediate results to.  
   
-	  When using the finite element capabilities of firedrake this is a 
-	  .h5 file accessible through the `CheckpointFile` interface from 
-	  firedrake. Otherwise this is a .csv file containing time in the 
-	  first entry of each line, and the solution in the remaining entries
+	 When using the finite element capabilities of firedrake this is a 
+	 .h5 file accessible through the `CheckpointFile` interface from 
+	 firedrake. Otherwise this is a .csv file containing time in the 
+	 first entry of each line, and the solution in the remaining entries
 
 - save\_steps: the number of intermediate steps to save.  
   
-	  The default is to save steps at delta\_t time interval if a filename
-	  is provided.
+	 The default is to save steps at delta\_t time interval if a filename
+	 is provided.
 
 - bc: Any boundary conditions to apply when using firedrake
 
@@ -415,15 +415,15 @@ Optional arguments:
 
 - fname: a filename to save intermediate results to.  
   
-	  When using the finite element capabilities of firedrake this is a 
-	  .h5 file accessible through the `CheckpointFile` interface from 
-	  firedrake. Otherwise this is a .csv file containing time in the 
-	  first entry of each line, and the solution in the remaining entries
+	 When using the finite element capabilities of firedrake this is a 
+	 .h5 file accessible through the `CheckpointFile` interface from 
+	 firedrake. Otherwise this is a .csv file containing time in the 
+	 first entry of each line, and the solution in the remaining entries
 
 - save\_steps: the number of intermediate steps to save.  
   
-	  The default is to save steps at delta\_t time interval if a filename
-	  is provided.
+	 The default is to save steps at delta\_t time interval if a filename
+	 is provided.
 
 - ivp\_options: a dictionary of arguments to pass to the exact solver.
 	
