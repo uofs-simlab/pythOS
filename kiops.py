@@ -85,7 +85,7 @@ def kiops(τ_out, A, u, tol = 1e-10, m_init = 10, mmin = 10, mmax = 128, iop = 2
    # compute the 1-norm of u
    local_nrmU = numpy.sum(abs(u[1:, :]), axis=1)
    global_normU = numpy.empty_like(local_nrmU)
-])
+   
    global_normU = local_nrmU
    normU = numpy.amax(global_normU)
 
