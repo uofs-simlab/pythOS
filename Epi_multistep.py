@@ -37,7 +37,7 @@ class EpiMultistep:
         if len(self.fn) < self.prev_steps:
             self.yn.insert(0, Function(y))
             self.fn.insert(0, F)
-            result = operator_splitting([f_in], dt, y, t, t.values()[0]+dt, 'Godunov', methods={(0,): "EXACT"}, ivp_methods={1: ('Dormand-Prince', 1e-12, 1e-14)})
+            result = operator_splitting([f_in], dt, y, t, t.values()[0]+dt, 'Godunov', methods={(0,): "ADAPTIVE"}, ivp_methods={1: ('Dormand-Prince', 1e-12, 1e-14)})
             return result
 
         v = Function(y)
@@ -95,7 +95,7 @@ class EpiMultistep:
         if len(self.fn) < self.prev_steps:
             self.yn.insert(0, y)
             self.fn.insert(0, f(y))
-            result = operator_splitting([lambda t, y: f(y)], dt, y, t, t+dt, 'Godunov', methods={(0,): "EXACT"})
+            result = operator_splitting([lambda t, y: f(y)], dt, y, t, t+dt, 'Godunov', methods={(0,): "ADAPTIVE"})
             
             return result
             

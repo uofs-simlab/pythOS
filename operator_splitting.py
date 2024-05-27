@@ -87,7 +87,7 @@ def time_step(function, delta_t, y, initial_t,
 
 def time_step_analytic(function, delta_t, y, initial_t):
     # this function takes the analytic solution of the DE and returns it.
-    # Only used when we want to use analytic solution for each sub-integrators instead of numerically exact values.
+    # Only used when we want to use analytic solution for each sub-integrators (or use a user-defined custom solver)
     f = function(delta_t,y)   
     if isinstance(y, Function):
         y.assign(f)
@@ -138,7 +138,7 @@ def exact_solution(function, initial_t, delta_t, initial_y, ivp_method,
         sol = solve_ivp(function, t_span, y0, method = ivp_method, 
                         rtol = rtol, atol = atol, t_eval = [initial_t, tf], **kwargs)
         if not sol.success:
-            print('exact integration failed')
+            print('adaptive integration failed')
             return np.nan + initial_y
         y = sol.y[:,-1]
     return y
@@ -209,11 +209,11 @@ def process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods,
                     options = solver_options[k+1] if k+1 in solver_options else {}
                     info = (SundialsExode(initial_y, info[0], info[1][0], info[1][1], **options), info[1])
                 tableau = (tableau, info)
-            exact_flag = (tableau == 'EXACT')
+            exact_flag = (tableau == 'ADAPTIVE')
             if isinstance(tableau, ButcherTableau):
                 options = solver_options[k+1] if k+1 in solver_options else {}
                 tableau = TimeStepper(function, tableau, initial_t, delta_t, initial_y, **options)
-            if tableau == 'EXACT':
+            if tableau == 'ADAPTIVE':
                 if k+1 in ivp_methods:
                     tableau = ivp_methods[k+1]
                 elif isinstance(initial_y, Function):
@@ -347,7 +347,7 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
         else:
             J = None
         for line in function_list:
-            (k, step, function_i, tableau, exact_flag, start_time)=line     # Here, if exact solution needed, use y=exact_solution(), if RK method needed use y=time_step() (as indicated by exact_flag)
+            (k, step, function_i, tableau, exact_flag, start_time)=line     # Here, if adaptive solution needed, use y=exact_solution(), if RK method needed use y=time_step() (as indicated by exact_flag)
             if not isinstance(initial_y, Function) and jacobian is not None:
                 function = lambda t, y: function_i(t, y, J)
             else:

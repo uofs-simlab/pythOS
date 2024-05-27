@@ -69,7 +69,7 @@ class Multirate:
                 sol = solve_ivp(func, [0, dt], yi, method=ivp_method, t_eval = [0, dt], **ivp_options)
                 if sol.success:
                     return sol.y[:, -1]
-                print('exact solve failed')
+                print('fast solve failed')
                 return np.nan * yi
         def implicit_solve(i):
             if isinstance(y0, np.ndarray):
@@ -190,8 +190,8 @@ def multirate_solve(y0, t0, dt, tf, method, fi, ff, fe=None, fname=None, save_st
     save_steps - the number of intermediate steps to save if fname is provided
            if it is not provided, the default is to save every step
            (or after every dt if embedded methods are being used).
-    ivp_options (optional) - a dictionary of keyword arguments to pass to the exact solver
-    ivp_method (optional) - the exact solver to use. Default is RK45, or Dormand-Prince for the finite element version.
+    ivp_options (optional) - a dictionary of keyword arguments to pass to the adaptive solver
+    ivp_method (optional) - the adaptive solver to use. Default is RK45, or Dormand-Prince for the finite element version.
     Return
     -----
     the approximate value of y at tf

@@ -125,7 +125,7 @@ It takes as inputs:
 	
 	Built-in options are:
 	- ANALYTIC - an analytical solution (or solution using a solver not packaged in pythOS).  To use this, the corresponding operator must be a function that takes as arguments (dt, y) and returns the new solution
-	- EXACT - a numerically exact solution.
+	- ADAPTIVE - a solution using an adaptive method to meet some tolerance
     - 'FE' forward Euler
 	- 'Heun' Heun's method
 	- 'RK3' the explicit Runge--Kutta of order 3
@@ -161,18 +161,21 @@ Optional arguments are:
   
 	 When using the finite element capabilities of firedrake this is a 
 	 .h5 file accessible through the `CheckpointFile` interface from 
-	 firedrake. Otherwise this is a .csv file containing time in the 
-	 first entry of each line, and the solution in the remaining entries
+	 `firedrake`. The file has attributes `/times/idx/` that store the time 
+	 of each entry and the attribute `/time/last_idx` indicates the last 
+	 valid index. The `Function`s are stored using corresponding indices. 
+	 Otherwise this is a .csv file containing time in the first entry of each 
+	 line, and the solution in the remaining entries
 
 - save\_steps: the number of intermediate steps to save.  
   
 	 The default is to save steps at delta\_t time interval if a filename
 	 is provided.
 
-- ivp\_methods: a dictionary to control the selection of the EXACT solver. 
+- ivp\_methods: a dictionary to control the selection of the ADAPTIVE solver. 
   
 	 Key `i` specified the method in use for the ith operator if it is solved 
-	 with an EXACT solver.  The entry has format 
+	 with an ADAPTIVE solver.  The entry has format 
 	 (method, relative tolerance, absolute tolerance).
 	 Available methods include:
 	 - any of the solvers from scipy.integrate.solve\_ivp
@@ -188,15 +191,15 @@ Optional arguments are:
 		 tableau, explicit tableau), and the provided operator should 
 		 also be a tuple of (explicit operator, explicit operator), of 
 		 which either (tableau and operator) may be None. 
-		 When using MRIStep as an exact solver, the provided operator must 
+		 When using MRIStep as an adaptive solver, the provided operator must 
 		 have form ((fast implicit, fast explicit), (slow implicit, slow 
 		 explicit)) with any of the operators optionally being None. 
 		 When using IDA as a solver, the operator must take arguments 
 		 (t, y, dydt) and return a residual.
 	 - any method not listed, by providing an instance of the `EmbeddedTableau` class found in `butcher_tableau.py`
 	 
-	  When using firedrake, only the exact solvers implemented in pythOS 
-	  are options (or a new method using the `EmbeddedTableau` class)
+	When using firedrake, only the adaptive solvers implemented in pythOS 
+	are options (or a new method using the `EmbeddedTableau` class)
 
 - epi\_options: a dictionary to control the solver underlying the EPI methods.
 
@@ -208,7 +211,7 @@ Optional arguments are:
 		scipy.integrate.solve\_ivp, an implemented embedded pair, an instance 
 		of the `EmbeddedTableau` class, or `CV_BDF` or `CV_ADAMS` or method 
 		from ERKStep or ARKStep (with method specification as with the 
-		EXACT options for ARKODE).  This uses an ODE integration as the underlying solver.
+		adaptive options for ARKODE).  This uses an ODE integration as the underlying solver.
 
 - os\_rtol: The relative tolerance for the splitting if using a method with 
   step size control
@@ -280,11 +283,15 @@ Optional arguments are:
 
 - fname: a filename to save intermediate results to.  
   
+  
 	 When using the finite element capabilities of firedrake this is a 
 	 .h5 file accessible through the `CheckpointFile` interface from 
-	 firedrake. Otherwise this is a .csv file containing time in the 
-	 first entry of each line, and the solution in the remaining entries
-
+	 `firedrake`. The file has attributes `/times/idx/` that store the time 
+	 of each entry and the attribute `/time/last_idx` indicates the last 
+	 valid index. The `Function`s are stored using corresponding indices. 
+	 Otherwise this is a .csv file containing time in the first entry of each 
+	 line, and the solution in the remaining entries
+ 
 - save\_steps: the number of intermediate steps to save.  
   
 	 The default is to save steps at delta\_t time interval if a filename
@@ -349,8 +356,11 @@ Optional arguments are:
   
 	 When using the finite element capabilities of firedrake this is a 
 	 .h5 file accessible through the `CheckpointFile` interface from 
-	 firedrake. Otherwise this is a .csv file containing time in the 
-	 first entry of each line, and the solution in the remaining entries
+	 `firedrake`. The file has attributes `/times/idx/` that store the time 
+	 of each entry and the attribute `/time/last_idx` indicates the last 
+	 valid index. The `Function`s are stored using corresponding indices. 
+	 Otherwise this is a .csv file containing time in the first entry of each 
+	 line, and the solution in the remaining entries
 
 - save\_steps: the number of intermediate steps to save.  
   
@@ -417,19 +427,22 @@ Optional arguments:
   
 	 When using the finite element capabilities of firedrake this is a 
 	 .h5 file accessible through the `CheckpointFile` interface from 
-	 firedrake. Otherwise this is a .csv file containing time in the 
-	 first entry of each line, and the solution in the remaining entries
+	 `firedrake`. The file has attributes `/times/idx/` that store the time 
+	 of each entry and the attribute `/time/last_idx` indicates the last 
+	 valid index. The `Function`s are stored using corresponding indices. 
+	 Otherwise this is a .csv file containing time in the first entry of each 
+	 line, and the solution in the remaining entries
 
 - save\_steps: the number of intermediate steps to save.  
   
 	 The default is to save steps at delta\_t time interval if a filename
 	 is provided.
 
-- ivp\_options: a dictionary of arguments to pass to the exact solver.
+- ivp\_options: a dictionary of arguments to pass to the adaptive solver.
 	
 	This includes the tolerances, which have default values of rtol=1e-10 and atol=1e-12
 
-- ivp\_method: the exact solver to use.
+- ivp\_method: the adaptive solver to use.
 
 	The default is RK45 from scipy for the non-finite element version, and 
 	Dormand-Prince from the pythOS collection for the finite element version.
