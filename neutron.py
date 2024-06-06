@@ -39,13 +39,13 @@ for dt in time_step:
 
     import sys
     sys.path.insert(1, sys.path[0]+"/../")
-    import operator_splitting as os
+    import fractional_step as fs
 
     T = 10.0
     #dt = 0.1
 
 
-    os.operator_splitting([F1,F2], dt, phi, t, T, "Strang", methods={(0,): '',(1,): "SD2O2", (2,): "Heun"} , bc = bc_D)
+    fs.fractional_step([F1,F2], dt, phi, t, T, "Strang", methods={(0,): '',(1,): "EPI3", (2,): "Heun"} , bc = bc_D)
 
     norm_phi.append(norm(phi, "L2"))
     print("L2 norm of phi:", norm_phi, ", dt = ", dt)

@@ -36,8 +36,6 @@ except Exception as e:
     IDA = type(None)
     SundialsExode = type(None)
 
-from Epi_multistep import EpiMultistep, epi_methods
-
 def time_step(function, delta_t, y, initial_t,
                     tableau, restore=False, **kwargs):
     """
@@ -267,7 +265,7 @@ def ave_Godunov_step(functions,initial_t,y,delta_t):
 
     return (y1+y2)/2
 
-def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t, 
+def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t, 
                              alpha, methods, b=None, fname=None, save_steps=0, ivp_methods={}, epi_options={}, os_rtol = 1e-3, os_atol = 1e-6, solver_parameters={}, jacobian=None, bc=None, stats=False):
     y=initial_y
     #process it
@@ -494,7 +492,7 @@ def operator_splitting_inner(functions, delta_t, initial_y, initial_t, final_t,
         f.close()
     return y
 
-def operator_splitting(
+def fractional_step(
         functions, delta_t, initial_y, initial_t, final_t, alpha,
         methods={},b=None, fname=None, save_steps=0, ivp_methods={},
         epi_options={}, os_rtol = 1e-3, os_atol = 1e-6, solver_parameters={}, jacobian=None,
@@ -576,7 +574,7 @@ def operator_splitting(
             y=ave_Godunov_step(functions, time, y, delta_t)
             time+=delta_t
     else:
-        y=operator_splitting_inner(functions, delta_t, initial_y, initial_t, 
+        y=fractional_step_inner(functions, delta_t, initial_y, initial_t, 
                                    final_t, alpha, methods,b, 
                                    fname, save_steps, ivp_methods, epi_options,
                                    os_rtol, os_atol, solver_parameters, jacobian, bc, stats)
@@ -932,7 +930,5 @@ def alphas_repo(alpha,b, N):
 adi_list=['MCS', 'HV', 'DR']
   
 
-
-
-
+from Epi_multistep import EpiMultistep, epi_methods
 

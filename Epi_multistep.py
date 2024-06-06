@@ -37,7 +37,7 @@ class EpiMultistep:
         if len(self.fn) < self.prev_steps:
             self.yn.insert(0, Function(y))
             self.fn.insert(0, F)
-            result = operator_splitting([f_in], dt, y, t, t.values()[0]+dt, 'Godunov', methods={(0,): "ADAPTIVE"}, ivp_methods={1: ('Dormand-Prince', 1e-12, 1e-14)})
+            result = fractional_step([f_in], dt, y, t, t.values()[0]+dt, 'Godunov', methods={(0,): "ADAPTIVE"}, ivp_methods={1: ('Dormand-Prince', 1e-12, 1e-14)})
             return result
 
         v = Function(y)
@@ -95,7 +95,7 @@ class EpiMultistep:
         if len(self.fn) < self.prev_steps:
             self.yn.insert(0, y)
             self.fn.insert(0, f(y))
-            result = operator_splitting([lambda t, y: f(y)], dt, y, t, t+dt, 'Godunov', methods={(0,): "ADAPTIVE"})
+            result = fractional_step([lambda t, y: f(y)], dt, y, t, t+dt, 'Godunov', methods={(0,): "ADAPTIVE"})
             
             return result
             
@@ -157,3 +157,5 @@ epi_methods = {'EPI2': np.array([[]]),
                                  [92/7, -99/14, 176/63, -1/2],
                                  [485/21, -151/14, 23/9, -31/168]])
 }
+
+from fractional_step import fractional_step

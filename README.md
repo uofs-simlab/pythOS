@@ -21,7 +21,7 @@ If using SUNDIALS, prior to use, the wrapper library must be built, and both the
 
 ### Fractional Step solver:
 
-The main function provided is `operator_splitting`.
+The main function provided is `fractional_step`.
 
 It takes as inputs:
 

@@ -5,10 +5,9 @@ import sys
 from scipy import sparse
 #set path to the Python_OS_Code directory
 sys.path.insert(1, sys.path[0]+'/../Python_OS_Code')
-from timing_script import time_test
 import timeit
 
-import operator_splitting as os
+import fractional_step as fs
 import numpy as np
 import scipy.linalg as la
 import math
@@ -126,7 +125,7 @@ for n in [10,15,20,30,35,50,70,100,130,150,200,300,400,500]: #np.linspace(4,50,2
      delta_t = 1.5/n
      print('delta_t = ', delta_t, 'time inverval [', str(t0), ' , ', str(tf), ']')
      for alpha in alphas:
-        result = os.operator_splitting(f_list, delta_t, y0, t0, tf, alpha, methods,
+        result = fs.fractional_step(f_list, delta_t, y0, t0, tf, alpha, methods,
                                         fname="./" + str(
                                             alpha) + "+" + str(methods[(1,)]) + "+" + str(
                                             methods[(2,)]) + " on interval " + str(t0) + " to " + str(
