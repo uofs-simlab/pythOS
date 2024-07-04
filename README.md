@@ -404,6 +404,86 @@ The `multirate_solve` function takes as inputs:
 - method
 	
 	an instance of the `Multirate` class defining the method to use
+
+- M
+    the number of fast steps per slow step
+
+- fs
+
+	The slow operator
+	
+- ff
+	
+	The fast operator
+	
+For each of the operators, they must be callable with arguments (t, y) and return a numpy array, unless using the finite element capabilities.
+
+If using the finite element capabilities, the operators must be Forms.
+
+Optional arguments:
+
+- fname: a filename to save intermediate results to.  
+  
+	 When using the finite element capabilities of firedrake this is a 
+	 .h5 file accessible through the `CheckpointFile` interface from 
+	 `firedrake`. The file has attributes `/times/idx/` that store the time 
+	 of each entry and the attribute `/time/last_idx` indicates the last 
+	 valid index. The `Function`s are stored using corresponding indices. 
+	 Otherwise this is a .csv file containing time in the first entry of each 
+	 line, and the solution in the remaining entries
+
+- save\_steps: the number of intermediate steps to save.  
+  
+	 The default is to save steps at delta\_t time interval if a filename
+	 is provided.
+
+
+- solver\_parameters: A dictionary to provide optional arguments to the underlying solvers.
+
+- bcs: Any Dirichlet boundary conditions to apply in the finite element version.
+
+
+For convienience, a predefined multirate method is provided.  It is:
+
+- mrgark\_ex2_im2 - Sarshar, Roberts and Sandu (2019) MrGARK EX2-IM2 2(1)[A]
+
+The `Multirate` class takes as inputs:
+
+- A_ff - a 2D numpy array
+- A_ss - a 2D numpy array
+- b_f - a 1D numpy array
+- b_s - a 1D numpy array
+- A_fs - a function with arguments (lambda, M) that returns a 2D numpy array
+- A_sf - a function with arguments (lambda, M) that returns a 2D numpy array
+
+#### Infinitesimal methods
+
+The `multirate_infinitesimal_solve` function takes as inputs:
+
+- y0
+
+	the initial value(s) to use for y
+	
+	this may be a single number or a 1-dimensional numpy array
+	
+	If using the finite element version, this must be of type Function
+
+- t0
+
+	the time value to start at
+	
+	If using the finite element version, this must be of type Constant
+- dt
+
+	the time step to advance by, which may be an integer or a float
+
+- tf
+
+	the time value to advance to
+
+- method
+	
+	an instance of the `Multirate_Infinitesimal` class defining the method to use
 	
 - fi
 
@@ -452,7 +532,7 @@ Optional arguments:
 - bcs: Any Dirichlet boundary conditions to apply in the finite element version.
 
 
-For convienience, some predefined multirate methods are provided.  These are:
+For convienience, some predefined multirate infinitesimal methods are provided.  These are:
 
 - mri\_kw3 - Knoth and Wolke (1997) order 3
 - mri\_erk2a - Sandu (2019) mri-gark-erk22a
@@ -465,7 +545,7 @@ For convienience, some predefined multirate methods are provided.  These are:
 - mri\_imex3 - Chinomona and Reynolds (2021) imex-mri-gark3a
 - mri\_imex4 - Chinomona and Reynolds (2021) imex-mri-gark4
 
-The `Multirate` class takes as inputs:
+The `Multirate_Infinitesimal` class takes as inputs:
 
 - c - A 1D numpy array
 - gamma - A 2D numpy array defining the coupling

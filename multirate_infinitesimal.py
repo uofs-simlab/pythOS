@@ -11,7 +11,7 @@ try:
 except:
     SundialsExode = type(None)
 from butcher_tableau import embedded_pairs, EmbeddedTableau
-class Multirate:
+class Multirate_Infinitesimal:
     def __init__(self, c, gamma, omega=None):
         self.c = c
         self.gamm = gamma
@@ -166,7 +166,7 @@ class Multirate:
 
 
 
-def multirate_solve(y0, t0, dt, tf, method, fi, ff, fe=None, fname=None, save_steps=None, bcs=None, ivp_options={}, ivp_method = 'RK45', implicit_solve_options={}):
+def multirate_infinitesimal_solve(y0, t0, dt, tf, method, fi, ff, fe=None, fname=None, save_steps=None, bcs=None, ivp_options={}, ivp_method = 'RK45', implicit_solve_options={}):
     """ This function uses a multirate infinitesimal method to solve a differential equation
     -----
     Inputs:
@@ -176,7 +176,7 @@ def multirate_solve(y0, t0, dt, tf, method, fi, ff, fe=None, fname=None, save_st
          if using the finite element version, this should be of type Constant
     dt - the amount time will increase by
     tf - the time to solve until
-    method - the method to use (of type Multirate)
+    method - the method to use (of type Multirate_Infinitesimal)
     fi - the slow operator of the differential equation, with inputs (t, y)
            if there are more than one (for imex-gark), this is the one that will be solved implicitly (with the gamma coefficients)
     ff - the fast operator of the differential equation, with inputs (t, y)
