@@ -218,7 +218,7 @@ Optional arguments are:
 - os\_atol: The absolute tolerance for the splitting if using a method with
   step size control
 
-- solver_parameters: A dictionary to provide optional arguments to the underlying solvers.
+- solver_parameters: A dictionary to provide optional arguments to the underlying solvers.  This can be used to do supstepping by providing a dictionary containing an entry `n_steps` for the relevant operator.
 
 - jacobian: A function to compute a jacobian when using dynamic linearization
 

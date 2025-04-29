@@ -61,23 +61,43 @@ def time_step(function, delta_t, y, initial_t,
     if delta_t == 0:
         return y
     if isinstance(tableau, Tableau):
-        f=tableau.y_step(function, y, initial_t, delta_t, **kwargs)
-        if isinstance(y, Function):
-            if delta_t.imag != 0:
-                y.assign(y + complex(delta_t) * f)
-            else:
-                y.assign(y + float(delta_t) * f)
+        if 'n_steps' in kwargs:
+            n_steps = kwargs['n_steps']
         else:
-            y+=delta_t*f
+            n_steps = 1
+        delta_t = delta_t / n_steps
+        if isinstance(initial_t, Constant):
+            ti = initial_t.values()[0]
+            if isinstance(ti, np.complex128):
+                ti = complex(ti)
+            else:
+                ti = float(ti)
+        for i in range(n_steps):
+            if isinstance(initial_t, Constant):
+                t0 = initial_t
+                t0.assign(ti + delta_t*i)
+            else:
+                t0 = initial_t + i*delta_t
+            f=tableau.y_step(function, y, t0, delta_t, index, **kwargs)
+            if isinstance(y, Function):
+                y.assign(y + delta_t * f)
+            else:
+                y+=delta_t*f
     elif isinstance(tableau, tuple) and isinstance(tableau[0], EpiMultistep):
         tableau, info = tableau
         y = tableau.solve(function, initial_t, y, delta_t, options=info, **kwargs)
     else:
+        if 'n_steps' in kwargs:
+            n_steps = kwargs['n_steps']
+        else:
+            n_steps = 1
+        delta_t = delta_t / n_steps
         if restore:
             yi = Function(tableau.u0)
         tableau.u0.assign(y)
         tableau.dt.assign(delta_t)
-        tableau.advance()
+        for i in range(n_steps):
+            tableau.advance()
         if restore:
             y.assign(tableau.u0)
             tableau.u0.assign(yi)
@@ -116,6 +136,7 @@ def exact_solution(function, initial_t, delta_t, initial_y, ivp_method,
     rtol, atol : 
         float or array_like. Relative and absolute tolerances.
         If using an EmbeddedTableau as the method, must be float, 
+            and only rtol is used
         
     Returns
     -------
@@ -171,15 +192,14 @@ def process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods,
                 if k==(len(functions)-1):
                     step=alpha[j][-2]
                 else:
-                    step=alpha[j][(-i-2)%(len(alpha[j])-2)]
+                    step=alpha[j][(k)%(len(alpha[j]))]
             else:
                 k=i
                 function=functions[i]
                 if i==(len(functions)-1):
                     step=alpha[j][-1]
                 else:
-                    step=alpha[j][(i)%(len(alpha[j])-1)]   # Get the step = delta_t*alpha_j^i
-
+                    step=alpha[j][(k)%(len(alpha[j]))]   # Get the step = delta_t*alpha_j^i
             # use k,j to determine which RK method to use, if none, use FE.
             if (k+1, j+1) in methods:
                 tableau=methods[(k+1, j+1)]
@@ -200,7 +220,6 @@ def process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods,
                 elif 0 in epi_options:
                     info = epi_options[0]
                 else:
-                    #info = ('Dormand-Prince', (1e-10, 1e-12))
                     info = ('kiops', 1e-10)
                         
                 if info[0] in ['CV_ADAMS', 'CV_BDF'] or 'ARKODE' in info[0] or 'ARKODE' in info[0][1]:
@@ -236,7 +255,6 @@ def process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods,
                 elif 'ARKODE' in tableau[0]:
                     tableau = (ERKStep(tableau[0], initial_y, function, initial_t, tableau[1], tableau[2]), tableau[1], tableau[2])
 
-            
             if isinstance(step, complex):
                 complex_flag=True
             if step!=0:
@@ -345,7 +363,7 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
         else:
             J = None
         for line in function_list:
-            (k, step, function_i, tableau, exact_flag, start_time)=line     # Here, if adaptive solution needed, use y=exact_solution(), if RK method needed use y=time_step() (as indicated by exact_flag)
+            (k, step, function_i, tableau, exact_flag, start_time)=line     # Here, if exact solution needed, use y=exact_solution(), if RK method needed use y=time_step() (as indicated by exact_flag)
             if not isinstance(initial_y, Function) and jacobian is not None:
                 function = lambda t, y: function_i(t, y, J)
             else:
@@ -405,7 +423,7 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
                     params = solver_parameters[k+1]
                 else:
                     params = None
-                y1 = exact_solution(function, ti, step, y1, ivp_method, 
+                y1 = exact_solution(function, ti, step, y1, ivp_method,
                                     rtol, atol, J = J, params=params)
                 if split:
                     if isinstance(initial_t, Constant):
@@ -415,7 +433,7 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
                         
                     else:
                         ti = t + start_time2
-                    y2 = exact_solution(function2, ti, step2, y2, ivp_method, 
+                    y2 = exact_solution(function2, ti, step2, y2, ivp_method,
                                         rtol, atol, J = J, params=params)
                     if isinstance(initial_t, Constant):
                         initial_t.assign(t0)
@@ -442,7 +460,11 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
                     break
 
         if bc is not None:
-            bc.apply(y1)
+            if isinstance(bc, list):
+                for bci in bc:
+                    bci.apply(y1)
+            else:
+                bc.apply(y1)
         if order is not None:
             try:
                 accept, err = measure_error(y, y1, y2, os_rtol, os_atol, k_factor=k_factor)
@@ -457,6 +479,11 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
         if accept:
             t += delta_t
             y = y1
+            if isinstance(initial_t, Constant):
+                initial_t.assign(t)
+            elif isinstance(initial_t, Function):
+                initial_t.assign(t)
+
         elif isinstance(y, Function):
             y.assign(ys)
         if order is not None:
@@ -484,8 +511,7 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
             line[3][1][0].free()
     
     if stats:
-        true_count = accepted_delta_t.count(False)
-        print("Number of rejected steps:", total_steps-accepted_steps)
+        print("Number of rejected steps:", total_steps - accepted_steps)
         print("Number of steps accepted:", accepted_steps)
 
     if fname is not None:
@@ -911,7 +937,7 @@ def alphas_repo(alpha,b, N):
                                  [0.5* Y4gamma2 + 0.5j* Y4gamma2] * N,
                                  [0.5* Y4gamma3 - 0.5j* Y4gamma3] * N,
                                  [0.5* Y4gamma3 + 0.5j* Y4gamma3] * N]
-    
+
     order = None
     k_factor = None
     if isinstance(alpha, str) and alpha in alphas: 
@@ -929,6 +955,4 @@ def alphas_repo(alpha,b, N):
 
 adi_list=['MCS', 'HV', 'DR']
   
-
 from Epi_multistep import EpiMultistep, epi_methods
-

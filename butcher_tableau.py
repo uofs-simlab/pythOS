@@ -112,7 +112,7 @@ class Tableau:
                 f = function[0]
                 test_f = f.arguments()[0]
                 if len(function) == 2:
-                    if isinstance(function[1], DirichletBC) or isinstance(function[1], list):
+                    if isinstance(function[1], DirichletBC):
                         bcs = function[1]
                     else:
                         f = function
@@ -165,11 +165,10 @@ class Tableau:
             if isinstance(F, Form):
                 F2 = inner(ki[i], test_f) * dx - F
 
-                #if bcs is not None:
-                #    bcs.apply(yi)
-                solve(replace(F2, {y0: yi}) == 0,  ki[i],
-                      bcs=bcs,
-                      solver_parameters=params)
+                if bcs is not None:
+                    bcs.apply(yi)
+
+                solve(replace(F2, {y0: yi}) == 0, ki[i], solver_parameters=params)
             else:
                 ki[i] = F(t, yi)
         t.assign(t_0)
@@ -304,9 +303,6 @@ class Tableau:
         y0.assign(y_s)
         for i in range(self._sizeb):
             y_s += ki[i] * float(self._b[i])
-        #if self._explicit:
-            #if bcs is not None:
-            #    bcs.apply(y_s)
         y_s.assign(y_s - y0)
         
         return y_s
@@ -326,7 +322,7 @@ class Tableau:
         if self._explicit:
             return np.dot(self.get_k_values_explicit(function, current_y, current_x, step), self._b)
         elif self._sdirk:
-            return np.dot(self.get_k_values_sdirk(function, current_y, current_x, step,  **kwargs), self._b)
+            return np.dot(self.get_k_values_sdirk(function, current_y, current_x, step, **kwargs), self._b)
         else:
             return np.dot(self.get_k_implicit(function, current_y, current_x, step, **kwargs), self._b)
 
@@ -430,6 +426,9 @@ def constant_matrix(function, current_y, time):
 def create_error_function(sol_1, sol_2, rel_tol, abs_tol, k_factor):
     if sol_1.ufl_shape == ():
         return Function(sol_1).interpolate(k_factor * (sol_1 - sol_2) / (abs(sol_1) * rel_tol+ abs_tol))
+    if (len(sol_1.ufl_shape) > 1):
+        return Function(sol_1).interpolate(k_factor * (sol_1 - sol_2) / norm((abs(sol_1) * rel_tol + abs_tol)))
+
     if len(split(sol_1)) == 1:
         try:
             return Function(sol_1).interpolate(k_factor * (sol_1 - sol_2) * (abs(sol_1) * rel_tol + abs_tol) ** -1)
