@@ -75,7 +75,7 @@ It takes as inputs:
 	- 'SM2': Strang-Marchuk method, 2nd order, ABBA scheme
 	- 'Strang': Strang method, 2nd order, ABAB scheme
 	- 'AKOpt22': Auzinger-Ketcheson, optimized 2nd-order, 2-stage method that has minimized local error measure
-		https://www.asc.tuwien.ac.at/~winfried/splitting/
+	    http://www.othmar-koch.org/splitting/
 	- 'OS22b': can take a parameter b and output a 2nd-order 2-stage method
 	- 'R3': Ruth, 3rd order
 	- 'C3': Chambers, 3rd order
@@ -94,9 +94,9 @@ It takes as inputs:
     - 'Godunov-3': Godunov for ABC scheme, 1st order
     - 'Strang-3': Strang, 2nd order
     - 'Y4-3': Yoshida, 4th order
-    - 'AK2s3i-3': Auzinger-Ketcheson 2nd-order 3-stage, ABC scheme v1, https://www.asc.tuwien.ac.at/~winfried/splitting/
-    - 'AK2s3ii-3':Auzinger-Ketcheson 2nd-order 3-stage, ABC scheme v2, https://www.asc.tuwien.ac.at/~winfried/splitting/
-    - 'AK2s5-3':Auzinger-Ketcheson 2nd-order 5-stage, ABC scheme, https://www.asc.tuwien.ac.at/~winfried/splitting/
+    - 'AK2s3i-3': Auzinger-Ketcheson 2nd-order 3-stage, ABC scheme v1, http://www.othmar-koch.org/splitting/
+    - 'AK2s3ii-3':Auzinger-Ketcheson 2nd-order 3-stage, ABC scheme v2, http://www.othmar-koch.org/splitting/
+    - 'AK2s5-3':Auzinger-Ketcheson 2nd-order 5-stage, ABC scheme, http://www.othmar-koch.org/splitting/
 	
 	Two N-split methods are also defined, which determine 
 	the appropriate number of operators based on the input 
