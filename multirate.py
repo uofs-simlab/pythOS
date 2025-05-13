@@ -71,7 +71,7 @@ def multirate_solve(y0, t0, dt, tf, method, M, fs, ff, bc=None, solver_parameter
         order.append(M*sf + j)
     for i in range(last_f, M*sf):
         order.append(i)
-    return gark_solve([ff, fs], dt, y0, t0, tf, [[Aff, Afs], [Asf, A_ss]], [b_new, b_s], bc=bc, solver_parameters=solver_parameters, fname=fname, save_steps=save_steps, order=order)
+    return gark_solve([ff, fs], dt, y0, t0, tf, [[Aff, Afs], [Asf, A_ss]], [b_new, b_s], bc=bc, solver_parameters=solver_parameters, fname=fname, save_steps=save_steps)
 
 
 

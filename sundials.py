@@ -7,9 +7,9 @@ class sundialsCDLL(CDLL):
         if result.errcheck is None:
             result.errcheck = error_check
         return result
-sundials = sundialsCDLL("libsundials_generic.so.6")
-nvector = sundialsCDLL("libsundials_nvecserial.so.6")
-linsol = sundialsCDLL("libsundials_sunlinsolspgmr.so.4")
+sundials = sundialsCDLL("libsundials_core.so")
+nvector = sundialsCDLL("libsundials_nvecserial.so")
+linsol = sundialsCDLL("libsundials_sunlinsolspgmr.so")
 wrapper = sundialsCDLL("sundials_wrapper.so")
 
 def memory_create_check(result, func, arguments):

@@ -1,7 +1,7 @@
 from ctypes import *
 import numpy as np
 from sundials import *
-arkode = sundialsCDLL("libsundials_arkode.so.5")
+arkode = sundialsCDLL("libsundials_arkode.so")
 
 arkode.ARKStepCreate.argtypes = [c_void_p, c_void_p, c_double, c_void_p, c_void_p]
 arkode.ARKStepCreate.restype = c_void_p

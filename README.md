@@ -550,3 +550,7 @@ The `Multirate_Infinitesimal` class takes as inputs:
 - c - A 1D numpy array
 - gamma - A 2D numpy array defining the coupling
 - omega (optional) - A 2D numpy array defining the coupling with the second slow operator.
+
+## Testing Examples
+
+There are a small set of tests available under `examples/tests/`.  There is more complete documentation [here](examples/tests/README.md)

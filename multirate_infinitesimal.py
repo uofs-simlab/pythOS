@@ -262,7 +262,7 @@ gamm = np.array([[[0,0,0,0],
                   [1/6+3/16, 3/10-15/16, 8/15, 0]]])
 
 # Knoth and Wolke (1997) order 3
-mri_kw3 = Multirate(cs, gamm)
+mri_kw3 = Multirate_Infinitesimal(cs, gamm)
 
 cs = np.array([0, 1/3, 2/3, 1])
 d=-1/2
@@ -281,7 +281,7 @@ gamm = np.array([[[0,0,0],
                   [c2, 0, 0],
                   [-(2 * c2**2 - 2*c2 + 1)/(2*c2), 1/(2*c2), 0]]])
 # Sandu (2019) mri-gark-erk22a
-mri_erk2a = Multirate(cs, gamm)
+mri_erk2a = Multirate_Infinitesimal(cs, gamm)
 
 c2 = 1
 cs = np.array([0, c2, 1])
@@ -289,10 +289,10 @@ gamm = np.array([[[0,0,0],
                   [c2, 0, 0],
                   [-(2 * c2**2 - 2*c2 + 1)/(2*c2), 1/(2*c2), 0]]])
 # Sandu (2019) mri-gark-erk22b
-mri_erk2b = Multirate(cs, gamm)
+mri_erk2b = Multirate_Infinitesimal(cs, gamm)
 
 # Sandu (2019) mri-gark-erk33 (order 3)
-mri_erk3 = Multirate(cs, gamm)
+mri_erk3 = Multirate_Infinitesimal(cs, gamm)
 
 
 cs = np.array([0, 1/5, 2/5, 3/5, 4/5, 1])
@@ -309,7 +309,7 @@ gamm = np.array([[[0,0,0,0,0,0],
                   [66974357/35697440, 21445367/7139488, -3, -8388609/4462180, 0,0],
                   [-18227/7520, 2, 1, 5, -41933/7520, 0]]])
 # Sandu (2019) mri-gark-erk45a
-mri_erk4 = Multirate(cs, gamm)
+mri_erk4 = Multirate_Infinitesimal(cs, gamm)
 
 cs = np.array([0, 1, 1, 1])
 gamm = np.array([[[0,0,0,0],
@@ -317,7 +317,7 @@ gamm = np.array([[[0,0,0,0],
                   [-1/2,0,1/2,0],
                   [0,0,0,0]]])
 # Sandu (2019) mri-gark-irk21a
-mri_irk2 = Multirate(cs, gamm)
+mri_irk2 = Multirate_Infinitesimal(cs, gamm)
 
 g = 0.435866521508458999416019
 cs = np.array([0, 1/3, 1/3, 2/3, 2/3, 1, 1, 1])
@@ -332,7 +332,7 @@ gamm = np.array([[[0,0,0,0,0,0,0,0],
                   [0,0,0,0,0,0,0,0]],
                  ])
 # Sandu (2019) mri-gark-esdirk34a
-mri_esdirk3a = Multirate(cs, gamm)
+mri_esdirk3a = Multirate_Infinitesimal(cs, gamm)
 
 g = 0.435866521508458999416019
 cs = np.array([0, g, g, (6 * g*g - 9 *g + 2)/(6*g**2 - 12 * g + 3), (6*g**2-9*g+2)/(6*g**2-12*g+3),1,1,1])
@@ -345,7 +345,7 @@ gamm = np.array([[[0,0,0,0,0,0,0,0],
                   [-g, 0, 0, 0, 0, 0, g, 0],
                   [0,0,0,0,0,0,0,0]]])
 # Sandu (2019) mri-gark-sdirk33a
-mri_sdirk3 = Multirate(cs, gamm)
+mri_sdirk3 = Multirate_Infinitesimal(cs, gamm)
 
 cs = np.zeros((8,))
 cs[1] = 0.4358665215084589994160194511935568425
@@ -374,7 +374,7 @@ omeg = np.array([[[0,0,0,0,0,0,0,0],
                   [0,0,0,0,0,0,0,0],
                   [.105858296071879638722377459477184953,0,.655567501140070250975288954324730635,0,-1.197292318720408889113685864995472431,0,.4358665215084589994160194511935568425,0]]])
 # Chinomona and Reynolds (2021) imex-mri-gark3a
-mri_imex3 = Multirate(cs, gamm, omeg)
+mri_imex3 = Multirate_Infinitesimal(cs, gamm, omeg)
 
 #cs = np.array([0,1/2,1/2,5/8,5/8,3/4,3/4,7/8,7/8,1,1,1])
 cs = np.array([0, .5, .5, .625, .625, .75, .75, .875, .875, 1, 1, 1, 1])
@@ -530,6 +530,6 @@ omeg = np.array([[[0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0],
 
 
 # Chinomona and Reynolds imex-mri-gark4
-mri_imex4 = Multirate(cs, gamm, omeg)
+mri_imex4 = Multirate_Infinitesimal(cs, gamm, omeg)
 
 
