@@ -11,7 +11,7 @@ Optional:
 
 - firedrake - for finite element capabilities
 - Irksome - for additional finite element capabilities
-- SUNDIALS (v6.7.0) - to use any of the sundials solvers for a subintegration
+- SUNDIALS (v7) - to use any of the sundials solvers for a subintegration
 
 ## Usage
 
