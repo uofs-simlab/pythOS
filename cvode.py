@@ -2,7 +2,10 @@ from ctypes import *
 import numpy as np
 
 from sundials import *
-sundials = sundialsCDLL("libsundials_cvode.so")
+if os.name == 'nt':
+    sundials = sundialsCDLL("sundials_cvode")
+else:
+    sundials = sundialsCDLL("libsundials_cvode.so")
 
 
 sundials.CVodeCreate.argtypes = [c_int, c_void_p]

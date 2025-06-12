@@ -17,8 +17,33 @@ Optional:
 
 The relevent code must be on the `PYTHONPATH` prior to import.
 
-If using SUNDIALS, prior to use, the wrapper library must be built, and both the wrapper and the SUNDIALS lib folder must be in the `LD_LIBRARY_PATH`
+On Unix systems, this can be achieved by running
 
+```
+export PYTHONPATH=$PWD:$PYTHONPATH
+
+```
+from the root directory of pythOS.
+
+On Windows systems, this can be acheived by running 
+
+```
+set PYTHONPATH=%CD%;%PYTHONPATH%
+```
+
+### Using SUNDIALS:
+
+If using SUNDIALS, prior to use, the wrapper library must be built.
+
+On Unix systems, a Makefile is provided to build the wrapper.  Both the wrapper and the SUNDIALS lib folder must be in the `LD_LIBRARY_PATH`.
+
+On Windows systems, the build has been tested using the Visual Studio build tools. The pythOS wrapper code expects the SUNDIALS library to be installed in a dependencies/install_sundials sub-directory.  Following this, the wrapper can be built with
+
+```
+cl /LD sundials_wrapper.c -I dependencies\install_sundials\include
+```
+
+Then the sundials wrapper can be used in pythOS without any additional setup.
 ### Fractional Step solver:
 
 The main function provided is `fractional_step`.

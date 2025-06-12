@@ -1,5 +1,6 @@
 from ctypes import *
 import numpy as np
+import os
 
 class sundialsCDLL(CDLL):
     def __getattr__(self, name):
@@ -7,10 +8,19 @@ class sundialsCDLL(CDLL):
         if result.errcheck is None:
             result.errcheck = error_check
         return result
-sundials = sundialsCDLL("libsundials_core.so")
-nvector = sundialsCDLL("libsundials_nvecserial.so")
-linsol = sundialsCDLL("libsundials_sunlinsolspgmr.so")
-wrapper = sundialsCDLL("sundials_wrapper.so")
+if os.name == 'nt':
+	os.add_dll_directory(os.path.join(os.path.dirname(__file__), "dependencies", "install_sundials", "bin"))
+	os.add_dll_directory(os.path.join(os.path.dirname(__file__), "dependencies", "install_sundials", "lib"))
+	sundials = sundialsCDLL("sundials_core")
+	nvector = sundialsCDLL("sundials_nvecserial")
+	linsol = sundialsCDLL("sundials_sunlinsolspgmr")
+	os.add_dll_directory(os.path.dirname(__file__))
+	wrapper = sundialsCDLL("sundials_wrapper")
+else:
+	sundials = sundialsCDLL("libsundials_core.so")
+	nvector = sundialsCDLL("libsundials_nvecserial.so")
+	linsol = sundialsCDLL("libsundials_sunlinsolspgmr.so")
+	wrapper = sundialsCDLL("sundials_wrapper.so")
 
 def memory_create_check(result, func, arguments):
     if result is None:
@@ -46,13 +56,13 @@ nvector.N_VMake_Serial.errcheck = memory_create_check
 nvector.N_VGetArrayPointer_Serial.argtypes = [c_void_p]
 nvector.N_VGetArrayPointer_Serial.restype = POINTER(c_double)
 nvector.N_VGetArrayPointer_Serial.errcheck = memory_access_check
-nvector.N_VDestroy.argtypes = [c_void_p]
-nvector.N_VDestroy.restype = None
+nvector.N_VDestroy_Serial.argtypes = [c_void_p]
+nvector.N_VDestroy_Serial.restype = None
 
 linsol.SUNLinSol_SPGMR.argtypes = [c_void_p, c_int, c_int, c_void_p]
 linsol.SUNLinSol_SPGMR.restype = c_void_p
 linsol.SUNLinSol_SPGMR.errcheck = memory_create_check
-linsol.SUNLinSolFree.argtypes = [c_void_p]
+linsol.SUNLinSolFree_SPGMR.argtypes = [c_void_p]
 
 class SundialsSolver:
     def __init__(self, y0, linear_solver = True):
@@ -75,9 +85,9 @@ class SundialsSolver:
         self.J = None
         
     def free(self, solver_mem, solver_free):
-        nvector.N_VDestroy(self.u)
+        nvector.N_VDestroy_Serial(self.u)
         if self.LS is not None:
-            linsol.SUNLinSolFree(self.LS)
+            linsol.SUNLinSolFree_SPGMR(self.LS)
         solver_free(byref(solver_mem))
         sundials.SUNContext_Free(self.ctx)
 

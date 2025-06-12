@@ -59,7 +59,8 @@ def ark_step_implicit(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control=Fa
         kwargs['method'] = 'krylov'
     
     while not accept:
-        Y = np.array([y0 for i in range(methods[0]._b.size)]).flatten(order='F').view(np.float64)
+        Y = np.array([y0 for i in range(methods[0]._b.size)]).transpose().flatten(order='F').view(np.float64)
+
         sol = root(root_func_implicit, Y, args=(f, step, y0, t0, methods, args), **kwargs)
         if not sol.success:
             print(sol.message)
