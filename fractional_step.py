@@ -78,7 +78,7 @@ def time_step(function, delta_t, y, initial_t,
                 t0.assign(ti + delta_t*i)
             else:
                 t0 = initial_t + i*delta_t
-            f=tableau.y_step(function, y, t0, delta_t, index, **kwargs)
+            f=tableau.y_step(function, y, t0, delta_t, **kwargs)
             if isinstance(y, Function):
                 y.assign(y + delta_t * f)
             else:
