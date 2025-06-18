@@ -39,38 +39,38 @@ stim_z = sum(zi <=0.15)
 firstcol = np.zeros(Nx)
 firstcol[0] = -2
 firstcol[1] = 1
-Mx = la.toeplitz(firstcol)
-Mx[0,1] = 2
-Mx[-1,-2] = 2
-Mx = 1/(dx**2)*Mx
+Dxx = la.toeplitz(firstcol)
+Dxx[0,1] = 2
+Dxx[-1,-2] = 2
+Dxx = 1/(dx**2)*Dxx
 
-Mx = sparse.kron(Mx, sparse.identity(Nz*Ny))
+Dxx = sparse.kron(Dxx, sparse.identity(Nz*Ny))
 firstcol = np.zeros(Ny)
 firstcol[0] = -2
 firstcol[1] = 1
-My = la.toeplitz(firstcol)
-My[0,1] = 2
-My[-1,-2] = 2
-My = 1/(dy**2)*My
-My = sparse.kron(sparse.identity(Nx), sparse.kron(My, sparse.identity(Nz)))
+Dyy = la.toeplitz(firstcol)
+Dyy[0,1] = 2
+Dyy[-1,-2] = 2
+Dyy = 1/(dy**2)*Dyy
+Dyy = sparse.kron(sparse.identity(Nx), sparse.kron(Dyy, sparse.identity(Nz)))
 
 firstcol = np.zeros(Nz)
 firstcol[0] = -2
 firstcol[1] = 1
-Mz = la.toeplitz(firstcol)
-Mz[0,1] = 2
-Mz[-1,-2] = 2
-Mz = 1/(dz**2)*Mz
+Dzz = la.toeplitz(firstcol)
+Dzz[0,1] = 2
+Dzz[-1,-2] = 2
+Dzz = 1/(dz**2)*Dzz
 
-Mz = sparse.kron(sparse.identity(Nx*Ny), Mz)
-M = sigma_l * Mx + sigma_t * My + sigma_t * Mz
+Dzz = sparse.kron(sparse.identity(Nx*Ny), Dzz)
+D = sigma_l * Dxx + sigma_t * Dyy + sigma_t * Dzz
 
 # operators:
 # First operator: dV/dt = 1/(chi*C)*sigma*M*V
 # Diffusion
 def fD(t, y):
     V = y[0:N]
-    dVdt = 1/(chi*C)*(M @ V)
+    dVdt = 1/(chi*C)*(D @ V)
     dWdt = np.zeros(18*N)
     dydt = np.append(dVdt, dWdt)
     return dydt
@@ -79,7 +79,6 @@ def fD(t, y):
 stim_amplitude = -50000
 nVars = 19
 def f_TTP(t,y):
-    #print(t)
     dydt = np.zeros(nVars*N)
 
     i_Stim = np.zeros((Nx, Ny, Nz))
@@ -106,3 +105,9 @@ for var in range(nVars):
 
 t0=0.
 tf=4
+
+import multirate_infinitesimal as mri
+
+mri.multirate_infinitesimal_solve(
+    y0, t0, 0.1, tf, mri.mri_kw3,
+    fD, f_TTP)

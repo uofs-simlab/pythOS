@@ -1,7 +1,6 @@
 import numpy as np
 from scipy import linalg, sparse
 from math import sqrt, cos, pi
-from scipy.sparse.linalg.dsolve import linsolve
 from scipy.optimize import root
 import timeit
 try:

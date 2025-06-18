@@ -36,13 +36,13 @@ y1 = 0
 yn = 0.7
 z1 = 0
 zn = 0.3
-dx = 0.5/10
+dx = 0.05
 dy = dx
 dz = dx
 Nx = int(round((xn -x1 + dx) / dx))
 Ny = int(round((yn - y1 + dy) / dy))
 Nz = int(round((zn - z1 + dz) / dz))
-
+print(Nx, Ny, Nz)
 N = Nx * Ny * Nz
 xi = np.linspace(x1, xn, num=Nx)
 yi = np.linspace(y1, yn, num=Ny)
@@ -53,65 +53,74 @@ stim_y = sum(yi <=0.15)
 stim_z = sum(zi <=0.15)
 
 V0 = -85.23 * np.ones(N)
-Xr1 = 0.00621 * np.ones(N)
-Xr2 = 0.4712 * np.ones(N)
-Xs = 0.0095 * np.ones(N)
-m = 0.00172 * np.ones(N)
-h = 0.7444 * np.ones(N)
-j = 0.7045 * np.ones(N)
-d = 3.373e-5 * np.ones(N)
-f = 0.7888 * np.ones(N)
-f2 = 0.9755 * np.ones(N)
-fCass = 0.9953 * np.ones(N)
-s = 0.999998 * np.ones(N)
-r = 2.42e-8 * np.ones(N)
-R_prime = 0.9073 * np.ones(N)
-Ca_i = 0.000126 * np.ones(N)
-Ca_Sr = 3.64 * np.ones(N)
-Ca_ss = 0.00036 * np.ones(N)
-Na_i = 8.604 * np.ones(N)
-K_i = 136.89 * np.ones(N)
+Xr10 = 0.00621 * np.ones(N)
+Xr20 = 0.4712 * np.ones(N)
+Xs0 = 0.0095 * np.ones(N)
+m0 = 0.00172 * np.ones(N)
+h0 = 0.7444 * np.ones(N)
+j0 = 0.7045 * np.ones(N)
+d0 = 3.373e-5 * np.ones(N)
+f0 = 0.7888 * np.ones(N)
+f20 = 0.9755 * np.ones(N)
+fCass0 = 0.9953 * np.ones(N)
+s0 = 0.999998 * np.ones(N)
+r0 = 2.42e-8 * np.ones(N)
+R_prime0 = 0.9073 * np.ones(N)
+Ca_i0 = 0.000126 * np.ones(N)
+Ca_Sr0 = 3.64 * np.ones(N)
+Ca_ss0 = 0.00036 * np.ones(N)
+Na_i0 = 8.604 * np.ones(N)
+K_i0 = 136.89 * np.ones(N)
 
-y0 = np.concatenate((V0, Xr1, Xr2, Xs, m, h, j, d,f,f2,fCass,s,r,R_prime,Ca_i,Ca_Sr,Ca_ss,Na_i,K_i))
+y0 = np.concatenate((V0, K_i0, Na_i0, Ca_i0, Xr10, Xr20, Xs0, m0,h0,j0,Ca_ss0,d0,f0,f20,fCass0,s0,r0,Ca_Sr0,R_prime0))
+#y0 = np.concatenate((V0, Xr10, Xr20, Xs0, m0, h0, j0, d0,f0,f20,fCass0,s0,r0,R_prime0,Ca_i0,Ca_Sr0,Ca_ss0,Na_i0,K_i0))
+ans = [2.31955735e+01, 3.98881690e-01, 1.20461456e-01, 1.36553037e-02,
+                9.99728227e-01, 5.61883611e-08, 6.51708166e-08, 9.87265864e-01,
+                7.78533609e-01, 8.96946333e-01, 9.95177252e-01, 4.40475973e-01,
+                7.77571418e-01, 9.08708925e-01, 1.26411299e-04, 3.63986901e+00,
+                3.15789877e-02, 8.61245039e+00, 1.36893465e+02]
+(V0_i, Xr1_i, Xr2_i, Xs_i, m_i, h_i, j_i, d_i,f_i,f2_i,fCass_i,s_i,r_i,R_prime_i,Ca_i_i,Ca_Sr_i,Ca_ss_i,Na_i_i,K_i_i) = ans
+
+#ans = np.array([V0_i,K_i_i,Na_i_i,Ca_i_i, Xr1_i, Xr2_i, Xs_i, m_i,h_i,j_i,Ca_ss_i,d_i,f_i,f2_i,fCass_i,s_i,r_i,Ca_Sr_i,R_prime_i])
 
 # Create the Laplacian Matrix, M using central differences
 # Central difference in x:
 firstcol = np.zeros(Nx)
 firstcol[0] = -2
 firstcol[1] = 1
-Mx = la.toeplitz(firstcol)
-Mx[0,1] = 2
-Mx[-1,-2] = 2
-Mx = 1/(dx**2)*Mx
+Dxx = la.toeplitz(firstcol)
+Dxx[0,1] = 2
+Dxx[-1,-2] = 2
+Dxx = 1/(dx**2)*Dxx
 
-Mx = sparse.kron(Mx, sparse.identity(Nz*Ny))
+Dxx = sparse.kron(Dxx, sparse.identity(Nz*Ny))
 firstcol = np.zeros(Ny)
 firstcol[0] = -2
 firstcol[1] = 1
-My = la.toeplitz(firstcol)
-My[0,1] = 2
-My[-1,-2] = 2
-My = 1/(dy**2)*My
-My = sparse.kron(sparse.identity(Nx), sparse.kron(My, sparse.identity(Nz)))
+Dyy = la.toeplitz(firstcol)
+Dyy[0,1] = 2
+Dyy[-1,-2] = 2
+Dyy = 1/(dy**2)*Dyy
+Dyy = sparse.kron(sparse.identity(Nx), sparse.kron(Dyy, sparse.identity(Nz)))
 
 firstcol = np.zeros(Nz)
 firstcol[0] = -2
 firstcol[1] = 1
-Mz = la.toeplitz(firstcol)
-Mz[0,1] = 2
-Mz[-1,-2] = 2
-Mz = 1/(dz**2)*Mz
+Dzz = la.toeplitz(firstcol)
+Dzz[0,1] = 2
+Dzz[-1,-2] = 2
+Dzz = 1/(dz**2)*Dzz
 
-Mz = sparse.kron(sparse.identity(Nx*Ny), Mz)
+Dzz = sparse.kron(sparse.identity(Nx*Ny), Dzz)
 
 # operators:
 # First operator: dV/dt = 1/(chi*C)*sigma*M*V
 # Diffusion
 from scipy.sparse.linalg import expm
-M = sigma_l * Mx + sigma_t * My + sigma_t * Mz
+D = sigma_l * Dxx + sigma_t * Dyy + sigma_t * Dzz
 def f1(t, y):
     V = y[0:N]
-    dVdt = 1/(chi*Cm)*(M @ V)
+    dVdt = 1/(chi*Cm)*(D @ V)
     dWdt = np.zeros(18*N)
     dydt = np.append(dVdt, dWdt)
     return dydt
@@ -123,7 +132,26 @@ stim_duration = 2
 # Second operator:
 # Reaction
 def f2(t, y):
+#    print(t)
     V = y[0:N]
+    K_i = y[N:2*N]
+    Na_i = y[2*N:3*N]
+    Ca_i = y[3*N:4*N]
+    Xr1 = y[4*N:5*N]
+    Xr2 = y[5*N:6*N]
+    Xs = y[6*N:7*N]
+    m = y[7*N:8*N]
+    h = y[8*N:9*N]
+    j = y[9*N:10*N]
+    Ca_ss = y[10*N:11*N]
+    d = y[11*N:12*N]
+    f = y[12*N:13*N]
+    f2 = y[13*N:14*N]
+    fCass = y[14*N:15*N]
+    s = y[15*N:16*N]
+    r = y[16*N:17*N]
+    Ca_Sr = y[17*N:18*N]
+    R_prime = y[18*N:]
     Xr1 = y[N:2*N]
     Xr2 = y[2*N:3*N]
     Xs = y[3*N:4*N]
@@ -142,6 +170,7 @@ def f2(t, y):
     Ca_ss = y[16*N:17*N]
     Na_i = y[17*N:18*N]
     K_i = y[18*N:]
+    #print(t)
 
     i_Stim = np.zeros((Nx, Ny, Nz))
     if t < stim_duration:
@@ -291,6 +320,7 @@ def f2(t, y):
 
     
     dydt = np.concatenate((dVdt, dXr1, dXr2, dXs, dm, dh, dj, dd, df, df2, dfCass, ds, dr, dR_prime, dCa_i, dCa_Sr, dCa_ss, dNa_i, dK_i))
+    #print(dydt[0])
     return dydt
 
 g_Kr = 0.153
@@ -331,7 +361,247 @@ if 'neg' in experiment:
         methods[(2,2)] = neg_exp
 
 fname = f"N_{alpha}_{experiment}_{neg_exp}_{dt}.csv"
-try:
-    fs.fractional_step(f_list, dt, y0, t0, tf, alpha, methods, fname = fname, save_steps = tf//2)
-except Exception as e:
-    print(e)
+from butcher_tableau import Tableau
+tf = 4
+import additive_rk as ark
+tableau_3_e = Tableau(
+    np.array([0, 1767732205903/2027836641118, 3/5, 1]),
+    np.array([[0,0,0,0],
+              [1767732205903/2027836641118,0,0,0],
+              [5535828885825/10492691773637,788022342437/10882634858940,0,0],
+              [6485989280629/16251701735622, -4246266847089/9704473918619,10755448449292/10357097424841,0]]),
+    np.array([1471266399579/7840856788654, -4482444167858/7529755066697, 11266239266428/11593286722821, 1767732205903/4055673282236]))
+tableau_3_i = Tableau(
+    np.array([0, 1767732205903/2027836641118, 3/5, 1]),
+    np.array([[0,0,0,0],
+              [1767732205903/4055673282236,1767732205903/4055673282236,0,0],
+              [2746238789719/10658868560708, -640167445237/6845629431997, 1767732205903/4055673282236, 0],
+              [1471266399579/7840856788654, -4482444167858/7529755066697, 11266239266428/11593286722821, 1767732205903/4055673282236]]),
+    np.array([1471266399579/7840856788654, -4482444167858/7529755066697, 11266239266428/11593286722821, 1767732205903/4055673282236]))
+
+tableau_i = Tableau(np.array([0,1]), np.array([[0,0],[0,1]]), np.array([0,1]))
+tableau_e = Tableau(np.array([0,1]), np.array([[0,0],[1,0]]), np.array([1,0]))
+#try:
+#result = ark.ark_solve([f1,f2], 0.002, y0, t0, tf, [tableau_i, tableau_e])
+beta = -0.25
+Aee = np.array([[0, 0, 0], [1/2, 0, 0], [1-beta, beta, 0]])
+Aei = np.array([[0, 0], [1/2, 0], [1/2, 1/2]])
+Aie = np.array([[1/4, 0, 0], [1/4, 1/2, 0]])
+Aii = np.array([[1/4, 0], [1/2, 1/4]])
+bE = np.array([1/4, 1/2, 1/4])
+bI = np.array([1/2, 1/2])
+
+g = (1 - np.sqrt(2))/2
+a = 0.5
+Aii = np.array([[g, 0], [1-g, g]])
+Aei = np.array([[0, 0],[1,0]])
+Aie = np.array([[g, 0], [a, 1-a]])
+Aee = np.array([[0,0],[1,0]])
+bE = np.array([1/2,1/2])
+bI = np.array([1-g, g])
+
+#Aee = np.array([[1/8,0],[1/4,3/8]])
+#Aei = np.array([[0,0],[2/3,0]])
+#Aie = np.array([[1/4,0],[1/4,3/4]])
+#Aii = np.array([[1/3,0],[2/3,1/6]])
+#bE = np.array([1/4,3/4])
+#bI = np.array([2/3,1/3])
+
+Aee = np.array([[1/2]])
+Aei = np.array([[1/2,0]])
+Aie=np.array([[1/3],[1]])
+Aii = np.array([[5/12,-1/12],[3/4,1/4]])
+bE = np.array([1])
+bI = np.array([3/4,1/4])
+
+Aee = np.array([[1/2]])
+Aei = np.array([[1/2,0]])
+Aie = np.array([[0],[1]])
+Aii = np.array([[1/2,-1/2],[1/2,1/2]])
+bE = np.array([1])
+bI = np.array([1/2,1/2])
+
+Aee = np.array([[0,0],[1,0]])
+Aie = np.array([[1/2,0]])
+Aei = np.array([[0],[1]])
+Aii = np.array([[1/2]])
+bE = np.array([1/2,1/2])
+bI = np.array([1])
+
+A = [[Aee, Aei], [Aie, Aii]]
+b = [bE, bI]
+
+import gark_methods as gark
+from multirate import multirate_solve, mrgark_ex2_im2, Multirate
+from multirate_infinitesimal import multirate_infinitesimal_solve, mri_kw3, mri_imex3
+
+mrgark_imim2 = Multirate(np.array([[1/2]]),
+                         np.array([[0,0],[0,1/2]]),
+                         np.array([1]),
+                         np.array([0,1]),
+                         lambda lam, M: np.array([1/2,0]),
+                         lambda lam, M: np.array([[0],[M/2]]) if lam == 1 else np.array([[0],[0]]))
+
+
+def Afs(l, M):
+    if M%2 == 0:
+        if l <= M//2:
+            return np.array([0])
+        else:
+            return np.array([1])
+    else:
+        if (l < M//2):
+            return np.array([0])
+        elif l == M//2:
+            return np.array([1/2])
+        else:
+            return np.array([1])
+def Asf(l, M):
+    if M%2 == 0:
+        if l <= M//2:
+            return np.array([1])
+        else:
+            return np.array([0])
+    else:
+        if (l < M//2):
+            return np.array([1])
+        elif l == M//2:
+            return np.array([1/2])
+        else:
+            return np.array([0])
+A_ff = np.array([[1/2]])
+A_ss = np.array([[1/2]])
+b_s = np.array([1])
+b_f = np.array([1])
+
+A_ss = np.array([[0,0],[1,0]])
+A_ff = np.array([[1/2]])
+b_s = np.array([1/2,1/2])
+b_f = np.array([1])
+Afs = lambda lam, M: np.array([1/2,0])
+Asf = lambda lam, M: np.array([[0], [M if lam == 1 else 0]])
+
+#A_ff = np.array([[1-1/np.sqrt(2), 0], [1/np.sqrt(2), 1 - 1/np.sqrt(2)]])
+#A_ss = np.array([[0,0],[2/3,0]])
+#b_f = np.array([1/np.sqrt(2), 1-1/np.sqrt(2)])
+#b_s = np.array([1/4,3/4])
+#Afs = lambda lam, M: np.array([[(2*M-np.sqrt(2))/(2*M), 0], [1/4,3/4]]) if lam == M else np.array([[(2*lam-np.sqrt(2))/(2*M), 0], [lam/M, 0]])
+#Asf = lambda lam, M: np.array([[0,0],[2/3,0]])
+
+#c = 1
+#A_ff = np.array([[0,0],[c,0]])
+#A_ss = np.array([[0,0],[c,0]])
+#b_f = np.array([(2*c-1)/(2*c), 1 / (2*c)])
+#b_s = np.array([(2*c-1)/(2*c), 1 / (2*c)])
+#def Afs(lam, M):
+#    L2 = np.floor(c * M)
+#    if lam <= L2:
+#        return np.array([[(lam-1)/M, 0], [(lam + c -1)/M, 0]])
+#    else:
+#        return np.array([[(lam-1)*(2*c-1)/(2*M*c), (lam - 1)/(2*M*c)],
+#                         [M/(3*(L2-M)) + (-lam + 2*c*(2*lam + c -2)+1)/(2*M*c), M/(3*M-3*L2) + (lam - 1)/(2*M*c) + (1-lam) / M]])
+#def Asf(lam, M):
+#    L2 = np.floor(c*M)
+#    if (lam <= L2):
+#        return np.array([[0,0],
+#                         [M*(-2*M+6*c+3*L2-3)/(6*L2), M*(2*M-3*L2+3)/(6*L2)]])
+#    return np.array([[0,0],[0,0]])
+
+
+import ttp
+def f_TTP(t,y):
+    #print(t)
+    #V = y[0:N]
+    #K_i = y[N:2*N]
+    #Na_i = y[2*N:3*N]
+    #Ca_i = y[3*N:4*N]
+    #Xr1 = y[4*N:5*N]
+    #Xr2 = y[5*N:6*N]
+    #Xs = y[6*N:7*N]
+    #m = y[7*N:8*N]
+    #h = y[8*N:9*N]
+    #j = y[9*N:10*N]
+    #Ca_ss = y[10*N:11*N]
+    #d = y[11*N:12*N]
+    #f = y[12*N:13*N]
+    #f2 = y[13*N:14*N]
+    #fCass = y[14*N:15*N]
+    #s = y[15*N:16*N]
+    #r = y[16*N:17*N]
+    #Ca_SR = y[17*N:18*N]
+    #R_prime = y[18*N:]
+    dydt = np.zeros(19*N)
+
+    i_Stim = np.zeros((Nx, Ny, Nz))
+    if t < stim_duration:
+        i_Stim[:stim_x,:stim_y,:stim_z] = stim_amplitude / chi / C
+    i_Stim = i_Stim.flatten()
+    states,constants = ttp.initConsts()
+    constants[5] = 0
+    constants[6] = 40
+    constants[7] = 2
+    constants[8] = i_Stim
+    for var in range(19):
+        states[var] = y[var*N:(var+1)*N]
+    rate = ttp.computeRates(t, states, constants)
+    for var in range(19):
+        dydt[var*N:(var+1)*N] = rate[var]
+#    print(len(rate))
+#    print(rate[0])
+#    for i in range(N):
+#        #print(i)
+#        constants[8] = i_Stim[i]
+#        rate = ttp.computeRates(t, [V[i],K_i[i],Na_i[i],Ca_i[i],Xr1[i],Xr2[i],
+#                                      Xs[i],m[i],h[i],j[i],Ca_ss[i],d[i],f[i],f2[i],fCass[i],s[i],r[i],Ca_SR[i],R_prime[i]],constants)
+#        for var in range(19):
+#            dydt[var*N+i] = rate[var]
+    return dydt
+
+states = []
+from math import *
+from numpy import *
+
+y0 = np.zeros(19*N)
+
+states, _ = ttp.initConsts()
+for var in range(19):
+    y0[var*N:(var+1)*N] = states[var]
+#result = multirate_infinitesimal_solve(y0,0,0.5,tf,mri_kw3,f1,f_TTP)
+#result = fs.fractional_step([lambda t, y: f1(t,y) + f_TTP(t,y)], 0.001, y0, t0, tf, 'Godunov', methods={(0,): "RK4"}, ivp_methods={1: ('RK45', 1e-6, 1e-8)})
+#except Exception as e:
+#    print(e)
+#print(max(f2(t0,y0)-f_TTP(t0,y0)))
+#input()
+A11 = np.array([[0,0],[1,0]])
+A12 = np.array([[0],[1]])
+A21 = np.array([[1/2,0]])
+A22 = np.array([[1/2]])
+b1 = np.array([1/2,1/2])
+b2 = np.array([1])
+A = [[A11,A12],[A21,A22]]
+b = [b1,b2]
+mrgark = Multirate(A_ff,A_ss,b_f,b_s,Afs,Asf)
+result = gark.gark_solve([f1,f_TTP], 1e-2, y0, 0, tf, A, b)#,solver_parameters={'method': ''})
+#result = multirate_solve(y0, 0, 1e-2, tf, mrgark,1,fs=f1,ff=f_TTP)
+
+import matplotlib.pyplot as plt
+from matplotlib import colors
+title = 'GARK'
+print(Nx, Ny, Nz)
+result = result.reshape((19,Nx, Ny, Nz))#[0,:,:,:]
+
+print(result[:,0,0,0]-ans)
+result = result[0,:,:,:]
+norm = colors.Normalize(vmin = np.min(result), vmax=np.max(result))
+fig, axs = plt.subplots(2,4)
+
+im=axs[0,0].contourf(result[:,:,0],norm=norm,levels=100)
+axs[0,1].contourf(result[:,:,1],norm=norm,levels=100)
+axs[0,2].contourf(result[:,:,2],norm=norm,levels=100)
+axs[0,3].contourf(result[:,:,3],norm=norm,levels=100)
+axs[1,0].contourf(result[:,:,4],norm=norm,levels=100)
+axs[1,1].contourf(result[:,:,5],norm=norm,levels=100)
+axs[1,2].contourf(result[:,:,6],norm=norm,levels=100)
+fig.suptitle(title)
+fig.colorbar(im, ax=axs,orientation='horizontal',fraction=.1)
+#plt.show()
