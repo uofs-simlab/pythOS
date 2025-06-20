@@ -2,7 +2,7 @@ import numpy as np
 from additive_rk import ark_solve
 from butcher_tableau import Tableau
 
-def gark_convert(A, b):
+def gark_convert(A, b, order=None):
     """ Convert the provided GARK structure to an ARK structure """
     # This assumes M = N, and J = I
     tableaus = []
@@ -14,13 +14,16 @@ def gark_convert(A, b):
         ai[:,pre:pre+si] = np.concatenate([A[q][i] for q in range(len(b))])
         bi = np.zeros(Ni) 
         bi[pre:pre+si] = b[i]
+        if (order is not None):
+            ai = ai[:,order][order,:]
+            bi = bi[order]
         ci = ai.sum(axis=1)
         tableaus.append(Tableau(ci, ai, bi))
         pre += si
     return tableaus
 
 
-def gark_solve(f, dt, y0, t0, tf, A, b, bc=None, solver_parameters={}, fname=None, save_steps = 0, jacobian=None):
+def gark_solve(f, dt, y0, t0, tf, A, b, bc=None, solver_parameters={}, fname=None, save_steps = 0, jacobian=None, order=None):
     """ This function uses an GARK method to solve a differential equation
     This is done by converting to an ARK structure
     -----
@@ -52,7 +55,7 @@ def gark_solve(f, dt, y0, t0, tf, A, b, bc=None, solver_parameters={}, fname=Non
         print("ERROR: not enough tableau provided")
         return
 
-    tableaus = gark_convert(A, b)
+    tableaus = gark_convert(A, b, order)
 
     return ark_solve(f, dt, y0, t0, tf, tableaus, bc=bc, solver_parameters=solver_parameters, fname=fname, save_steps = save_steps, jacobian=jacobian)
 

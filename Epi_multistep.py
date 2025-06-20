@@ -6,6 +6,7 @@ try:
     from kiops_fem import kiops_fem
 except:
     Function = type(None)
+    Constant = type(None)
 
 try:
     from sundials_exode import SundialsExode

@@ -11,14 +11,39 @@ Optional:
 
 - firedrake - for finite element capabilities
 - Irksome - for additional finite element capabilities
-- SUNDIALS (v6.7.0) - to use any of the sundials solvers for a subintegration
+- SUNDIALS (v7) - to use any of the sundials solvers for a subintegration
 
 ## Usage
 
 The relevent code must be on the `PYTHONPATH` prior to import.
 
-If using SUNDIALS, prior to use, the wrapper library must be built, and both the wrapper and the SUNDIALS lib folder must be in the `LD_LIBRARY_PATH`
+On Unix systems, this can be achieved by running
 
+```
+export PYTHONPATH=$PWD:$PYTHONPATH
+
+```
+from the root directory of pythOS.
+
+On Windows systems, this can be acheived by running 
+
+```
+set PYTHONPATH=%CD%;%PYTHONPATH%
+```
+
+### Using SUNDIALS:
+
+If using SUNDIALS, prior to use, the wrapper library must be built.
+
+On Unix systems, a Makefile is provided to build the wrapper.  Both the wrapper and the SUNDIALS lib folder must be in the `LD_LIBRARY_PATH`.
+
+On Windows systems, the build has been tested using the Visual Studio build tools. The pythOS wrapper code expects the SUNDIALS library to be installed in a dependencies/install_sundials sub-directory.  Following this, the wrapper can be built with
+
+```
+cl /LD sundials_wrapper.c -I dependencies\install_sundials\include
+```
+
+Then the sundials wrapper can be used in pythOS without any additional setup.
 ### Fractional Step solver:
 
 The main function provided is `fractional_step`.
@@ -75,7 +100,7 @@ It takes as inputs:
 	- 'SM2': Strang-Marchuk method, 2nd order, ABBA scheme
 	- 'Strang': Strang method, 2nd order, ABAB scheme
 	- 'AKOpt22': Auzinger-Ketcheson, optimized 2nd-order, 2-stage method that has minimized local error measure
-		https://www.asc.tuwien.ac.at/~winfried/splitting/
+	    http://www.othmar-koch.org/splitting/
 	- 'OS22b': can take a parameter b and output a 2nd-order 2-stage method
 	- 'R3': Ruth, 3rd order
 	- 'C3': Chambers, 3rd order
@@ -94,9 +119,9 @@ It takes as inputs:
     - 'Godunov-3': Godunov for ABC scheme, 1st order
     - 'Strang-3': Strang, 2nd order
     - 'Y4-3': Yoshida, 4th order
-    - 'AK2s3i-3': Auzinger-Ketcheson 2nd-order 3-stage, ABC scheme v1, https://www.asc.tuwien.ac.at/~winfried/splitting/
-    - 'AK2s3ii-3':Auzinger-Ketcheson 2nd-order 3-stage, ABC scheme v2, https://www.asc.tuwien.ac.at/~winfried/splitting/
-    - 'AK2s5-3':Auzinger-Ketcheson 2nd-order 5-stage, ABC scheme, https://www.asc.tuwien.ac.at/~winfried/splitting/
+    - 'AK2s3i-3': Auzinger-Ketcheson 2nd-order 3-stage, ABC scheme v1, http://www.othmar-koch.org/splitting/
+    - 'AK2s3ii-3':Auzinger-Ketcheson 2nd-order 3-stage, ABC scheme v2, http://www.othmar-koch.org/splitting/
+    - 'AK2s5-3':Auzinger-Ketcheson 2nd-order 5-stage, ABC scheme, http://www.othmar-koch.org/splitting/
 	
 	Two N-split methods are also defined, which determine 
 	the appropriate number of operators based on the input 
@@ -550,3 +575,7 @@ The `Multirate_Infinitesimal` class takes as inputs:
 - c - A 1D numpy array
 - gamma - A 2D numpy array defining the coupling
 - omega (optional) - A 2D numpy array defining the coupling with the second slow operator.
+
+## Testing Examples
+
+There are a small set of tests available under `examples/tests/`.  There is more complete documentation [here](examples/tests/README.md)

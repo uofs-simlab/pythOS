@@ -1,6 +1,9 @@
 from sundials import *
 
-ida = sundialsCDLL("libsundials_ida.so.6")
+if os.name =='nt':
+    ida = sundialsCDLL("sundials_ida")
+else:
+    ida = sundialsCDLL("libsundials_ida.so")
 
 ida.IDACreate.argtypes = [c_void_p]
 ida.IDACreate.restype = c_void_p
