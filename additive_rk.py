@@ -42,6 +42,33 @@ def ark_step(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control=False, orde
         else:
             accept = True
     return step, step_old, y_out
+def ark_step_explicit(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control=False, order=None, J=None, **kwargs):
+    """
+    Take a step in time using an additive runge kutta method.
+    This function assumes at least one component method is implicit, but none are fully implicit (i.e. at least one method is a dirk method)
+    """
+    ki = np.zeros((len(f), np.size(y0), methods[0]._b.size), dtype = y0.dtype)
+    accept = False
+    step_old = step
+    if J is not None:
+        args = (J,)
+    else:
+        args = ()
+   
+    while not accept:
+        for i in range(methods[0]._b.size):
+            Y = y0 + step * sum([np.dot(ki[j], methods[j]._a[i]) for j in range(len(f))])
+            for j in range(len(f)):
+                ki[j,:,i] = f[j](t0 + step *methods[j]._c[i], Y, *args)
+        y_out = y0 + step * sum([np.dot(ki[i], methods[i]._b) for i in range(len(f))])
+        if control:
+            y_err = y0 + step * sum([np.dot(ki[i], methods[i].b_aux) for i in range(len(f))])
+            accept, err = measure_error(y0, y_out, y_err, rtol, atol)
+            step_old = step
+            step = compute_time(err, order, step_old)
+        else:
+            accept = True
+    return step, step_old, y_out
 
 def ark_step_implicit(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control=False, order=None, J = None, **kwargs):
     """
@@ -287,11 +314,14 @@ def ark_solve(functions, dt, y0, t0, tf, methods, rtol=1e-3, atol=1e-6, bc=None,
 
     # determine if the fully implicit solver is needed and if step size control is being used
     fully_implicit = False
+    explicit = True
     order = np.inf
     control = True
     for method in methods:
         if np.any(np.triu(method._a, 1)!=0):
             fully_implicit = True
+        if np.any(np.triu(method._a)!=0):
+            explicit = False
         if not isinstance(method, EmbeddedTableau):
             control = False
         else:
@@ -299,9 +329,13 @@ def ark_solve(functions, dt, y0, t0, tf, methods, rtol=1e-3, atol=1e-6, bc=None,
     step = ark_step
     if fully_implicit:
         step = ark_step_implicit
+    if explicit:
+        step = ark_step_explicit
     if isinstance(y0, Function):
         if fully_implicit:
             step = ark_step_implicit_fem
+        #elif explicit:
+        #    step = ark_step_explicit_fem
         else:
             step = ark_step_fem
         fem = True
