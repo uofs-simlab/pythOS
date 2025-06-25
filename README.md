@@ -212,9 +212,9 @@ Optional arguments are:
 	 - If using SUNDIALS, `CV_ADAMS` and `CV_BDF` for a solver from CVOde,
 	 `IDA`, or any of the method strings for MRIStep, ERKStep or ARKStep.
 	 
-		 If using ARKStep, the method is a tuple specifying (explicit 
+		 If using ARKStep, the method is a tuple specifying (implicit 
 		 tableau, explicit tableau), and the provided operator should 
-		 also be a tuple of (explicit operator, explicit operator), of 
+		 also be a tuple of (implicit operator, explicit operator), of 
 		 which either (tableau and operator) may be None. 
 		 When using MRIStep as an adaptive solver, the provided operator must 
 		 have form ((fast implicit, fast explicit), (slow implicit, slow 

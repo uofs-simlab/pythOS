@@ -67,7 +67,7 @@ linsol.SUNLinSolFree_SPGMR.argtypes = [c_void_p]
 class SundialsSolver:
     def __init__(self, y0, linear_solver = True):
         ctx = wrapper.allocate_context()
-        sundials.SUNContext_Create(None, ctx)
+
         self.N = y0.size
 
         if y0.dtype == complex:

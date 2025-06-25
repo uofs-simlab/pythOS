@@ -232,9 +232,10 @@ def process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods,
                     tableau = (MRIStep(initial_y, function[0], initial_t, tableau[1], tableau[2], function[1], delta_t, **options), tableau[1], tableau[2])
                 elif (tableau[0][0] is None or 'ARKODE' in tableau[0][0]) and (tableau[0][1] is None or 'ARKODE' in tableau[0][1]):
                     options = solver_options[k+1] if k+1 in solver_options else {}
-                    tableau = (ARKStep(tableau[0], initial_y, function[0], function[1], initial_t, tableau[1], tableau[2], **options), tableau[1], tableau[2])
+                    tableau = (ARKStep(tableau[0], initial_y, function[1], function[0], initial_t, tableau[1], tableau[2], **options), tableau[1], tableau[2])
                 elif 'ARKODE' in tableau[0]:
-                    tableau = (ERKStep(tableau[0], initial_y, function, initial_t, tableau[1], tableau[2]), tableau[1], tableau[2])
+                    options = solver_options[k+1] if k+1 in solver_options else {}
+                    tableau = (ERKStep(tableau[0], initial_y, function, initial_t, tableau[1], tableau[2], **options), tableau[1], tableau[2])
 
             
             if isinstance(step, complex):
