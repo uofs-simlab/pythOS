@@ -31,9 +31,14 @@ sundials.CVodeReInit.restype = c_int
 sundials.CVodeFree.argtypes = [c_void_p]
 sundials.CVodeFree.restype = None
 
+sundials.CVodeSetMaxNumSteps.argtypes = [c_void_p,c_long]
+sundials.CVodeSetMaxNumSteps.restype = c_int
+
+sundials.CVodeSetJacTimes.argtypes = [c_void_p, c_void_p, c_void_p]
+sundials.CVodeSetJacTimes.restyp = c_int
 
 class CVODE(SundialsSolver):
-    def __init__(self, ode_type, y0, f, t0, rtol, atol, jac=None, **kwargs):
+    def __init__(self, ode_type, y0, f, t0, rtol, atol, jac=None, max_steps=0,**kwargs):
         super().__init__(y0)
         if ode_type == 'CV_ADAMS':
             ode_type = 1
@@ -68,7 +73,9 @@ class CVODE(SundialsSolver):
                 return 0
             JF = CFUNCTYPE(c_int, c_void_p, c_void_p, c_double, c_void_p, c_void_p, c_void_p, c_void_p)(jac)
             self.JF = JF
-            cvode.CVodeSetJacTimes(cvode_mem, None, JF)
+            sundials.CVodeSetJacTimes(cvode_mem, None, JF)
+        
+        sundials.CVodeSetMaxNumSteps(cvode_mem, max_steps)
         
         self.ctx = ctx
         self.LS = LS

@@ -19,13 +19,17 @@ ida.IDAReInit.argtypes = [c_void_p, c_double, c_void_p, c_void_p]
 ida.IDACalcIC.argtypes = [c_void_p, c_int, c_double]
 
 ida.IDAFree.restype = None
+
+ida.IDASetMaxNumSteps.argtypes = [c_void_p, c_long]
+ida.IDASetMaxNumSteps.restype = c_int
 class IDA(SundialsSolver):
-    def __init__(self, fn, y0, rtol, atol, t0, ydot0 = None, id = None, jac=None, **kwargs):
+    def __init__(self, fn, y0, rtol, atol, t0, ydot0 = None, id = None, jac=None, max_steps=0, **kwargs):
         super().__init__(y0, linear_solver = True)
 
         if ydot0 is None:
             ydot0 = np.zeros(y0.size, dtype=y0.dtype)
         self.udot = nvector.N_VMake_Serial(y0.size, ydot0.ctypes.data_as(POINTER(c_double)), self.ctx)
+        self.ydot = ydot0
 
         ida_mem = ida.IDACreate(self.ctx)
 
@@ -84,6 +88,8 @@ class IDA(SundialsSolver):
             self.JF = JF
             ida.IDASetJacTimes(ida_mem, None, JF)
 
+        ida.IDASetMaxNumSteps(ida_mem, max_steps)
+
         self.F = F
         self.ida_mem = c_void_p(ida_mem)
 
@@ -106,13 +112,17 @@ class IDA(SundialsSolver):
             ida.IDACalcIC(self.ida_mem, 1, tf)
         t_ret = c_double(0.0)
 
-        ida.IDASolve(self.ida_mem, tf, byref(t_ret), self.u, self.udot, 1)
+        try:
+            ida.IDASolve(self.ida_mem, tf, byref(t_ret), self.u, self.udot, 1)
+        except Exception as e:
+            print("IDASolve failed")
+            return y0 * np.nan
         
 
         return np.array(np.fromiter(nvector.N_VGetArrayPointer_Serial(self.u), dtype=np.float64, count=self.N)).view(self.dtype)
 
     def free(self):
         assert self.ida_mem is not None
-        nvector.N_VDestroy(self.udot)
+        nvector.N_VDestroy_Serial(self.udot)
         super().free(self.ida_mem, ida.IDAFree)
         self.ida_mem = None
