@@ -3,7 +3,7 @@ import scipy.linalg as linalg
 from butcher_tableau import constant_matrix
 from scipy import sparse
 
-from scipy.sparse.linalg.dsolve import linsolve
+from scipy.sparse.linalg import spsolve
 
 def mcs(functions, initial_y, initial_t, delta_t):
     """
@@ -41,7 +41,7 @@ def mcs(functions, initial_y, initial_t, delta_t):
         A_matrix=constant_matrix(functions[j], yj, initial_t+delta_t)
         left=sparse.identity(np.size(initial_y))-alpha[1][j]*delta_t*A_matrix
         right=yj+alpha[1][j]*delta_t*(-functions[j](initial_t, initial_y)+functions[j](initial_t+delta_t, yj)-(A_matrix*yj))
-        yj=linsolve.spsolve(left, right)
+        yj=spsolve(left, right)
     for i in range(2,len(alpha)-1):
         for j in range(len(functions)):
             y0+=alpha[i][j]*delta_t*(functions[j](initial_t+delta_t, yj)-functions[j](initial_t, initial_y))
@@ -50,7 +50,7 @@ def mcs(functions, initial_y, initial_t, delta_t):
         A_matrix=constant_matrix(functions[j], yj, initial_t)
         left=sparse.identity(np.size(initial_y))-alpha[-1][j]*delta_t*A_matrix
         right=yj+alpha[-1][j]*delta_t*(-functions[j](initial_t, initial_y)+functions[j](initial_t+delta_t, yj)-A_matrix*yj)
-        yj=linsolve.spsolve(left, right)
+        yj=spsolve(left, right)
     return yj
 
 def hv(functions, initial_y, initial_t, delta_t):
