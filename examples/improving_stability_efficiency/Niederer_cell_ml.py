@@ -75,7 +75,7 @@ def fD(t, y):
     dydt = np.append(dVdt, dWdt)
     return dydt
 
-# Second operator: Reaction
+# Second operator: Reaction using the CellML definition
 stim_amplitude = -50000
 nVars = 19
 def f_TTP(t,y):
@@ -106,6 +106,7 @@ for var in range(nVars):
 t0=0.
 tf=4
 
+# solve with an MRI method as an additional example
 import multirate_infinitesimal as mri
 
 mri.multirate_infinitesimal_solve(

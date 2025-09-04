@@ -130,7 +130,7 @@ stim_period = 40
 stim_start = 0
 stim_duration = 2
 # Second operator:
-# Reaction
+# Reaction - TTP model
 def f2(t, y):
 #    print(t)
     V = y[0:N]
@@ -170,7 +170,7 @@ def f2(t, y):
     Ca_ss = y[16*N:17*N]
     Na_i = y[17*N:18*N]
     K_i = y[18*N:]
-    #print(t)
+    print(t)
 
     i_Stim = np.zeros((Nx, Ny, Nz))
     if t < stim_duration:
@@ -318,7 +318,7 @@ def f2(t, y):
 
     dVdt = -(i_K1 + i_t0 + i_Kr + i_Ks + i_CaL + i_NaK + i_Na + i_b_Na + i_NaCa + i_b_Ca + i_p_K + i_p_Ca + i_Stim)
 
-    
+    # concatenate result for output
     dydt = np.concatenate((dVdt, dXr1, dXr2, dXs, dm, dh, dj, dd, df, df2, dfCass, ds, dr, dR_prime, dCa_i, dCa_Sr, dCa_ss, dNa_i, dK_i))
     #print(dydt[0])
     return dydt
@@ -361,247 +361,7 @@ if 'neg' in experiment:
         methods[(2,2)] = neg_exp
 
 fname = f"N_{alpha}_{experiment}_{neg_exp}_{dt}.csv"
-from butcher_tableau import Tableau
-tf = 4
-import additive_rk as ark
-tableau_3_e = Tableau(
-    np.array([0, 1767732205903/2027836641118, 3/5, 1]),
-    np.array([[0,0,0,0],
-              [1767732205903/2027836641118,0,0,0],
-              [5535828885825/10492691773637,788022342437/10882634858940,0,0],
-              [6485989280629/16251701735622, -4246266847089/9704473918619,10755448449292/10357097424841,0]]),
-    np.array([1471266399579/7840856788654, -4482444167858/7529755066697, 11266239266428/11593286722821, 1767732205903/4055673282236]))
-tableau_3_i = Tableau(
-    np.array([0, 1767732205903/2027836641118, 3/5, 1]),
-    np.array([[0,0,0,0],
-              [1767732205903/4055673282236,1767732205903/4055673282236,0,0],
-              [2746238789719/10658868560708, -640167445237/6845629431997, 1767732205903/4055673282236, 0],
-              [1471266399579/7840856788654, -4482444167858/7529755066697, 11266239266428/11593286722821, 1767732205903/4055673282236]]),
-    np.array([1471266399579/7840856788654, -4482444167858/7529755066697, 11266239266428/11593286722821, 1767732205903/4055673282236]))
-
-tableau_i = Tableau(np.array([0,1]), np.array([[0,0],[0,1]]), np.array([0,1]))
-tableau_e = Tableau(np.array([0,1]), np.array([[0,0],[1,0]]), np.array([1,0]))
-#try:
-#result = ark.ark_solve([f1,f2], 0.002, y0, t0, tf, [tableau_i, tableau_e])
-beta = -0.25
-Aee = np.array([[0, 0, 0], [1/2, 0, 0], [1-beta, beta, 0]])
-Aei = np.array([[0, 0], [1/2, 0], [1/2, 1/2]])
-Aie = np.array([[1/4, 0, 0], [1/4, 1/2, 0]])
-Aii = np.array([[1/4, 0], [1/2, 1/4]])
-bE = np.array([1/4, 1/2, 1/4])
-bI = np.array([1/2, 1/2])
-
-g = (1 - np.sqrt(2))/2
-a = 0.5
-Aii = np.array([[g, 0], [1-g, g]])
-Aei = np.array([[0, 0],[1,0]])
-Aie = np.array([[g, 0], [a, 1-a]])
-Aee = np.array([[0,0],[1,0]])
-bE = np.array([1/2,1/2])
-bI = np.array([1-g, g])
-
-#Aee = np.array([[1/8,0],[1/4,3/8]])
-#Aei = np.array([[0,0],[2/3,0]])
-#Aie = np.array([[1/4,0],[1/4,3/4]])
-#Aii = np.array([[1/3,0],[2/3,1/6]])
-#bE = np.array([1/4,3/4])
-#bI = np.array([2/3,1/3])
-
-Aee = np.array([[1/2]])
-Aei = np.array([[1/2,0]])
-Aie=np.array([[1/3],[1]])
-Aii = np.array([[5/12,-1/12],[3/4,1/4]])
-bE = np.array([1])
-bI = np.array([3/4,1/4])
-
-Aee = np.array([[1/2]])
-Aei = np.array([[1/2,0]])
-Aie = np.array([[0],[1]])
-Aii = np.array([[1/2,-1/2],[1/2,1/2]])
-bE = np.array([1])
-bI = np.array([1/2,1/2])
-
-Aee = np.array([[0,0],[1,0]])
-Aie = np.array([[1/2,0]])
-Aei = np.array([[0],[1]])
-Aii = np.array([[1/2]])
-bE = np.array([1/2,1/2])
-bI = np.array([1])
-
-A = [[Aee, Aei], [Aie, Aii]]
-b = [bE, bI]
-
-import gark_methods as gark
-from multirate import multirate_solve, mrgark_ex2_im2, Multirate
-from multirate_infinitesimal import multirate_infinitesimal_solve, mri_kw3, mri_imex3
-
-mrgark_imim2 = Multirate(np.array([[1/2]]),
-                         np.array([[0,0],[0,1/2]]),
-                         np.array([1]),
-                         np.array([0,1]),
-                         lambda lam, M: np.array([1/2,0]),
-                         lambda lam, M: np.array([[0],[M/2]]) if lam == 1 else np.array([[0],[0]]))
-
-
-def Afs(l, M):
-    if M%2 == 0:
-        if l <= M//2:
-            return np.array([0])
-        else:
-            return np.array([1])
-    else:
-        if (l < M//2):
-            return np.array([0])
-        elif l == M//2:
-            return np.array([1/2])
-        else:
-            return np.array([1])
-def Asf(l, M):
-    if M%2 == 0:
-        if l <= M//2:
-            return np.array([1])
-        else:
-            return np.array([0])
-    else:
-        if (l < M//2):
-            return np.array([1])
-        elif l == M//2:
-            return np.array([1/2])
-        else:
-            return np.array([0])
-A_ff = np.array([[1/2]])
-A_ss = np.array([[1/2]])
-b_s = np.array([1])
-b_f = np.array([1])
-
-A_ss = np.array([[0,0],[1,0]])
-A_ff = np.array([[1/2]])
-b_s = np.array([1/2,1/2])
-b_f = np.array([1])
-Afs = lambda lam, M: np.array([1/2,0])
-Asf = lambda lam, M: np.array([[0], [M if lam == 1 else 0]])
-
-#A_ff = np.array([[1-1/np.sqrt(2), 0], [1/np.sqrt(2), 1 - 1/np.sqrt(2)]])
-#A_ss = np.array([[0,0],[2/3,0]])
-#b_f = np.array([1/np.sqrt(2), 1-1/np.sqrt(2)])
-#b_s = np.array([1/4,3/4])
-#Afs = lambda lam, M: np.array([[(2*M-np.sqrt(2))/(2*M), 0], [1/4,3/4]]) if lam == M else np.array([[(2*lam-np.sqrt(2))/(2*M), 0], [lam/M, 0]])
-#Asf = lambda lam, M: np.array([[0,0],[2/3,0]])
-
-#c = 1
-#A_ff = np.array([[0,0],[c,0]])
-#A_ss = np.array([[0,0],[c,0]])
-#b_f = np.array([(2*c-1)/(2*c), 1 / (2*c)])
-#b_s = np.array([(2*c-1)/(2*c), 1 / (2*c)])
-#def Afs(lam, M):
-#    L2 = np.floor(c * M)
-#    if lam <= L2:
-#        return np.array([[(lam-1)/M, 0], [(lam + c -1)/M, 0]])
-#    else:
-#        return np.array([[(lam-1)*(2*c-1)/(2*M*c), (lam - 1)/(2*M*c)],
-#                         [M/(3*(L2-M)) + (-lam + 2*c*(2*lam + c -2)+1)/(2*M*c), M/(3*M-3*L2) + (lam - 1)/(2*M*c) + (1-lam) / M]])
-#def Asf(lam, M):
-#    L2 = np.floor(c*M)
-#    if (lam <= L2):
-#        return np.array([[0,0],
-#                         [M*(-2*M+6*c+3*L2-3)/(6*L2), M*(2*M-3*L2+3)/(6*L2)]])
-#    return np.array([[0,0],[0,0]])
-
-
-import ttp
-def f_TTP(t,y):
-    #print(t)
-    #V = y[0:N]
-    #K_i = y[N:2*N]
-    #Na_i = y[2*N:3*N]
-    #Ca_i = y[3*N:4*N]
-    #Xr1 = y[4*N:5*N]
-    #Xr2 = y[5*N:6*N]
-    #Xs = y[6*N:7*N]
-    #m = y[7*N:8*N]
-    #h = y[8*N:9*N]
-    #j = y[9*N:10*N]
-    #Ca_ss = y[10*N:11*N]
-    #d = y[11*N:12*N]
-    #f = y[12*N:13*N]
-    #f2 = y[13*N:14*N]
-    #fCass = y[14*N:15*N]
-    #s = y[15*N:16*N]
-    #r = y[16*N:17*N]
-    #Ca_SR = y[17*N:18*N]
-    #R_prime = y[18*N:]
-    dydt = np.zeros(19*N)
-
-    i_Stim = np.zeros((Nx, Ny, Nz))
-    if t < stim_duration:
-        i_Stim[:stim_x,:stim_y,:stim_z] = stim_amplitude / chi / C
-    i_Stim = i_Stim.flatten()
-    states,constants = ttp.initConsts()
-    constants[5] = 0
-    constants[6] = 40
-    constants[7] = 2
-    constants[8] = i_Stim
-    for var in range(19):
-        states[var] = y[var*N:(var+1)*N]
-    rate = ttp.computeRates(t, states, constants)
-    for var in range(19):
-        dydt[var*N:(var+1)*N] = rate[var]
-#    print(len(rate))
-#    print(rate[0])
-#    for i in range(N):
-#        #print(i)
-#        constants[8] = i_Stim[i]
-#        rate = ttp.computeRates(t, [V[i],K_i[i],Na_i[i],Ca_i[i],Xr1[i],Xr2[i],
-#                                      Xs[i],m[i],h[i],j[i],Ca_ss[i],d[i],f[i],f2[i],fCass[i],s[i],r[i],Ca_SR[i],R_prime[i]],constants)
-#        for var in range(19):
-#            dydt[var*N+i] = rate[var]
-    return dydt
-
-states = []
-from math import *
-from numpy import *
-
-y0 = np.zeros(19*N)
-
-states, _ = ttp.initConsts()
-for var in range(19):
-    y0[var*N:(var+1)*N] = states[var]
-#result = multirate_infinitesimal_solve(y0,0,0.5,tf,mri_kw3,f1,f_TTP)
-#result = fs.fractional_step([lambda t, y: f1(t,y) + f_TTP(t,y)], 0.001, y0, t0, tf, 'Godunov', methods={(0,): "RK4"}, ivp_methods={1: ('RK45', 1e-6, 1e-8)})
-#except Exception as e:
-#    print(e)
-#print(max(f2(t0,y0)-f_TTP(t0,y0)))
-#input()
-A11 = np.array([[0,0],[1,0]])
-A12 = np.array([[0],[1]])
-A21 = np.array([[1/2,0]])
-A22 = np.array([[1/2]])
-b1 = np.array([1/2,1/2])
-b2 = np.array([1])
-A = [[A11,A12],[A21,A22]]
-b = [b1,b2]
-mrgark = Multirate(A_ff,A_ss,b_f,b_s,Afs,Asf)
-result = gark.gark_solve([f1,f_TTP], 1e-2, y0, 0, tf, A, b)#,solver_parameters={'method': ''})
-#result = multirate_solve(y0, 0, 1e-2, tf, mrgark,1,fs=f1,ff=f_TTP)
-
-import matplotlib.pyplot as plt
-from matplotlib import colors
-title = 'GARK'
-print(Nx, Ny, Nz)
-result = result.reshape((19,Nx, Ny, Nz))#[0,:,:,:]
-
-print(result[:,0,0,0]-ans)
-result = result[0,:,:,:]
-norm = colors.Normalize(vmin = np.min(result), vmax=np.max(result))
-fig, axs = plt.subplots(2,4)
-
-im=axs[0,0].contourf(result[:,:,0],norm=norm,levels=100)
-axs[0,1].contourf(result[:,:,1],norm=norm,levels=100)
-axs[0,2].contourf(result[:,:,2],norm=norm,levels=100)
-axs[0,3].contourf(result[:,:,3],norm=norm,levels=100)
-axs[1,0].contourf(result[:,:,4],norm=norm,levels=100)
-axs[1,1].contourf(result[:,:,5],norm=norm,levels=100)
-axs[1,2].contourf(result[:,:,6],norm=norm,levels=100)
-fig.suptitle(title)
-fig.colorbar(im, ax=axs,orientation='horizontal',fraction=.1)
-#plt.show()
+try:
+    fs.fractional_step(f_list, dt, y0, t0, tf, alpha, methods, fname = fname, save_steps = tf//2)
+except Exception as e:
+    print(e)
