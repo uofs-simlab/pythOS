@@ -5,9 +5,11 @@ This folder includes files demonstrating the solution of the stiff brusselator p
 ## Problem Definition
 
 ```math
-u_t = \alpha_u u_{xx} + \rho_u u_x + a - (w + 1)u + u^2v,\\
-v_t = \alpha_v v_{xx} + \rho_v v_x + wu - u^2v,\\
-w_t = \alpha_w w_{xx} + \rho_w w_x + (b-w)/\epsilon - wu
+\begin{aligned}
+u_t &= \alpha_u u_{xx} + \rho_u u_x + a - (w + 1)u + u^2v \\
+v_t &= \alpha_v v_{xx} + \rho_v v_x + wu - u^2v \\
+w_t &= \alpha_w w_{xx} + \rho_w w_x + (b-w)/\epsilon - wu
+\end{aligned}
 ```
 
 with $`\alpha_u = \alpha_v = \alpha_w = 10^{-2}`$, $`\rho_u=\rho_v=\rho_w = 10^{-3}`$, $`a=0.6`$, $`b=2`$ and $`\epsilon = 10^{-3}`$
