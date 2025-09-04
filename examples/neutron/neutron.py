@@ -5,9 +5,9 @@ norm_phi = []
 time_step = [0.2, 0.1, 0.05, 0.025, 0.0125, 0.00625, 0.003125]
 
 for dt in time_step:
-
+    # Create the domain
     N =16
-
+    
     mesh = RectangleMesh(N, N, 5.0, 5.0) 
 
     V = FunctionSpace(mesh, "CG", 2)  
@@ -15,6 +15,7 @@ for dt in time_step:
     dof = V.dim()
     print("DOF = ", dof)
 
+    # Define the problem (constants)
     phi = Function(V)
     v = TestFunction(V)
 
@@ -29,10 +30,12 @@ for dt in time_step:
     x, y = SpatialCoordinate(mesh)
     S = A * (omega * (b*x - x**2) * cos(omega* t) + sin(omega* t) * (Sigma_a * (b* x - x**2)+ 2 * D))
 
+    # Define the operators
     n = FacetNormal(mesh)
     F1 = D * inner(inner(grad(phi), n), v) * (ds(1) + ds(2)) - D * inner(grad(phi), grad(v)) * dx
     F2 = (- inner(phi, v)* Sigma_a + inner(S, v)) * dx
 
+    # Define the boundary condition
     bc_D = DirichletBC(V, 0.0, [1, 2])  
 
     phi.sub(0).assign(0)
@@ -44,13 +47,13 @@ for dt in time_step:
     T = 10.0
     #dt = 0.1
 
-
-    fs.fractional_step([F1,F2], dt, phi, t, T, "Strang", methods={(0,): '',(1,): "EPI3", (2,): "Heun"} , bc = bc_D)
+    # Solve the problem 
+    fs.fractional_step([F1,F2], dt, phi, t, T, "Strang", methods={(0,): '',(1,): "SD2O2", (2,): "Heun"} , bc = bc_D)
 
     norm_phi.append(norm(phi, "L2"))
     print("L2 norm of phi:", norm_phi, ", dt = ", dt)
     
-
+# Create a table including the approximate order
 orders = []
 orders.append(None)
 for i in range(len(norm_phi)-1):
