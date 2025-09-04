@@ -1,5 +1,7 @@
 import numpy as np
 
+# Output error message if error is larger than expected threshold
+# Output solution if verbose
 def output(verbose, error_threshold, solution, result, name):
     if verbose:
         print("{:<40} {} with error {}".format(name+" solution", solution, result-solution))
@@ -7,6 +9,10 @@ def output(verbose, error_threshold, solution, result, name):
     if max(abs((result - solution)/solution)) > error_threshold:
         print("error using", name, "larger than expected", abs((result-solution)/solution))
 
+
+# Plot a sequence of time-series
+# The reference is plotted with a solid line, and the 
+# non-adaptive solutions are plotted in non-solid lines
 def plot(reference_fname, fname_labels, title=None, show=True):
     from matplotlib import pyplot as plt
     plt.figure()

@@ -2,6 +2,14 @@
 
 This directory provides some basic tests of pythOS functionality to ensure the code and any desired dependencies are setup correctly.  Provided here is information about the options to control selection of dependencies and output.
 
+## Problem Definition
+
+```math
+\begin{aligned}
+\frac{dX}{dt} &= X^2 Y + A - B X^2 \\
+\frac{dY}{dt} &= B X - X^2 Y
+\end{aligned}
+```
 ## Fractional Step Tests
 
 The file is `fractional_step_test.py`, which can be run as

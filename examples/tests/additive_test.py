@@ -17,6 +17,7 @@ if len(sys.argv) == 2 and (sys.argv[1] == "-h" or sys.argv[1] == '--help'):
     -h | --help\tDisplay this help message and exit (if it is the only command line flag)""")
     exit()
 
+# creating tableau for 3rd order IMEX
 tableau_3_e = Tableau(
     np.array([0, 1767732205903/2027836641118, 3/5, 1]),
     np.array([[0,0,0,0],
@@ -32,14 +33,16 @@ tableau_3_i = Tableau(
               [1471266399579/7840856788654, -4482444167858/7529755066697, 11266239266428/11593286722821, 1767732205903/4055673282236]]),
     np.array([1471266399579/7840856788654, -4482444167858/7529755066697, 11266239266428/11593286722821, 1767732205903/4055673282236]))
 
+# compute reference with adaptive solver
 solution = fs.fractional_step([lambda t, y: f1(t,y) + f2(t,y)], .1, y0, 0, tf, 'Godunov', {(0,): 'ADAPTIVE'}, fname='adaptive.csv')
 if verbose:
     print("{:<40} {}".format("adaptive solution", solution))
 
+# solve with basic IMEX method
 result = ark.ark_solve([f1,f2], 0.1, y0, 0, tf, [tableau_3_e,tableau_3_i],fname='ark_solve.csv')
 output(verbose, 0.02, result, solution, "Additive RK")
 
-
+#  create embedded method
 tableau_e = EmbeddedTableau(
     np.array([0, 1/2, 83/250, 31/50, 17/20, 1]),
     np.array([[0,0,0,0,0,0],
@@ -61,9 +64,11 @@ tableau_i = EmbeddedTableau(
     np.array([82889/524892, 0, 15625/83664, 69875/102672, -2260/8211, 1/4]),
     np.array([4586570599.0/29645900160.0, 0, 178811875.0/945068544.0, 814220225.0/1159782912.0, -3700637.0/11593932.0, 61727.0/225920.0]), 3)
 
+# solve with embedded method
 result = ark.ark_solve([f1,f2], 0.2, y0, 0, tf, [tableau_e,tableau_i],fname='ark_solve_adaptive.csv',rtol=1e-6,atol=1e-8)
 output(verbose, 0.02, result, solution, "Adaptive additive RK")
 
+# Create arrays for GARK method
 beta = 0.5
 Aee = np.array([[0, 0, 0], [1/2, 0, 0], [1-beta, beta, 0]])
 Aei = np.array([[0, 0], [1/2, 0], [1/2, 1/2]])
@@ -75,9 +80,11 @@ bI = np.array([1/2, 1/2])
 
 A = [[Aee, Aei], [Aie, Aii]]
 b = [bE, bI]
+# solve with GARK solver
 result = gark.gark_solve([f1,f2],0.1,y0,0,tf,A,b, fname='gark_solve.csv')
 output(verbose,0.1,result,solution, "Generalized additive RK")
 
+# optionally plot the solutions to compare time series
 if '-p' in sys.argv or '--plot' in sys.argv:
     labels={'ark_solve.csv': "Additive RK",
             'ark_solve_adaptive.csv': "Adaptive additive RK",

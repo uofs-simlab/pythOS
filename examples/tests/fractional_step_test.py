@@ -16,7 +16,7 @@ if len(sys.argv) == 2 and (sys.argv[1] == "-h" or sys.argv[1] == '--help'):
     -h | --help\tDisplay this help message and exit (if it is the only command line flag)""")
     exit()
 
-
+# compute reference with Adaptive solver
 solution = fs.fractional_step([lambda t, y: f1(t,y) + f2(t,y)], .1, y0, 0, tf, 'Godunov', {(0,): 'ADAPTIVE'}, fname='adaptive.csv')
 if verbose:
     print("{:<40} {}".format("adaptive solution", solution))
@@ -78,6 +78,7 @@ result = fs.fractional_step([f1,f2], 0.1, y0, 0, tf, 'C4', {(2,): "EPI2",(1,): "
 output(verbose, 0.05, result, solution, "using EPI (Cash-Karp) solver")
 
     
+# Optionally plot the time series
 if '-p' in sys.argv or '--plot' in sys.argv:
     basic_labels = {
         'split.csv': "basic split",
