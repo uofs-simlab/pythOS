@@ -8,9 +8,9 @@ try:
 except:
     Function = type(None)
 
-class EPIMethod:
+class EPIRKMethod:
     def __init__(self, p, g, ab):
-        """ Initialize EPI Method object.
+        """ Initialize EPIRK Method object.
         array ab contains the a coefficients, and the b coefficients in the last row
         """
         self.p = p
@@ -116,9 +116,9 @@ class EPIMethod:
                 Ri[j, i] = (Ri[j-1, i] - Ri[j-1, i-1])
         return Yi[-1][:-1]
 
-    def y_step(self, f, y, t0, dt, mask):
+    def y_step(self, f, y, t0, dt, options=('kiops', 1e-3), **kwargs):
         """Return the adjustment on y for the next step"""
-        return (self.step(f, t0, y, dt) - y) / dt
+        return (self.step(f, t0, y, dt, options) - y) / dt
 
 def jac(f, y, t):
     out = np.zeros((y.size, y.size), y.dtype)
@@ -131,22 +131,22 @@ def jac(f, y, t):
     return out
 
 
-epi_methods = {
-        'EPI2': EPIMethod(np.array([[1, 0], [0, 1]]), np.array([[0.5, 0], [1, 1]]), np.array([[0, 0], [1, 0/3]])),
-        'EPI3': EPIMethod(np.array([[1, 0], [0, 1]]), np.array([[0.5, 0], [1, 1]]), np.array([[1, 0], [1, 2/3]])),
+epirk_methods = {
+        'EPIRK2': EPIRKMethod(np.array([[1, 0], [0, 1]]), np.array([[0.5, 0], [1, 1]]), np.array([[0, 0], [1, 0/3]])),
+        'EPIRK3': EPIRKMethod(np.array([[1, 0], [0, 1]]), np.array([[0.5, 0], [1, 1]]), np.array([[1, 0], [1, 2/3]])),
         }
 s = 30 ** 0.5
-epi_methods['EPI4']= EPIMethod(np.array([[1, 0, 0], [0, 1, 0], [0, -1, 6]]),
+epirk_methods['EPIRK4']= EPIRKMethod(np.array([[1, 0, 0], [0, 1, 0], [0, -1, 6]]),
         np.array([[1/3, 0, 0], [2/3, 2/3, 0], [1, 1, 1]]),
         np.array([[27 * (s**2 + 18)/(12*(54-3*s**2+2*s**3)), 0,0], [18*s*(s**2+18)/(24*(54 - 3*s**2+2*s**3)), 0, 0], [1, 96*(54-s**2)*(54-3*s**2+2*s**3)**2/ (729 * (s**2 + 18)**3), 384*(54-3*s**2 + 2*s**3)**2 / (162 * (s**2 + 18) **3)]]))
 
 
-epi_methods['EPI4s3'] = EPIMethod(np.array([[1, 0, 0, 0], [0, 0, 1892, -42336],
+epirk_methods['EPIRK4s3'] = EPIRKMethod(np.array([[1, 0, 0, 0], [0, 0, 1892, -42336],
     [0, 0, 1458, -34992]]),
     np.array([[1/8, 0, 0], [1/9, 0, 0], [1, 1, 1]]),
     np.array([[1/8, 0, 0],
         [1/9, 0, 0], [1, 1, 1]]))
         
-epi_methods['EPI5s3'] = EPIMethod(np.array([[1, 0, 0], [2/3, 2/3, 0], [2/3, 1/2, 1]]), np.array([[0.41657015580651858694, 0, 0], [0.86246743701274574979, 0.5, 0], [1, 0.730416157608327661916, 0.325076967060782773227]]), np.array([[0.41657015580651858694, 0, 0], [0.86246743701274574979, 1.32931146991722972036, 0], [1, 1.15467303405015770322, 0.30931492086655796815]]))
+epirk_methods['EPIRK5s3'] = EPIRKMethod(np.array([[1, 0, 0], [2/3, 2/3, 0], [2/3, 1/2, 1]]), np.array([[0.41657015580651858694, 0, 0], [0.86246743701274574979, 0.5, 0], [1, 0.730416157608327661916, 0.325076967060782773227]]), np.array([[0.41657015580651858694, 0, 0], [0.86246743701274574979, 1.32931146991722972036, 0], [1, 1.15467303405015770322, 0.30931492086655796815]]))
 
-epi_methods['EPI5s4'] = EPIMethod(np.array([[1, 0, 0, 0], [0, 4, 0, 0], [0, -2, 16, 0], [0, 4/3, -16, 64]]), np.array([[1/4,0,0,0],[1/2,1/2,0,0],[3/4,1/2,1/2,0],[1, (195+3315**0.5)/260, (255-3315**0.5)/204, (60+3315**0.5)/104]]), np.array([[1/4,0,0,0],[2/4, -1/108, 0, 0], [3/4, 1/2, 1/4,0], [1, 52/45, 68/75,52/45]]))
+epirk_methods['EPIRK5s4'] = EPIRKMethod(np.array([[1, 0, 0, 0], [0, 4, 0, 0], [0, -2, 16, 0], [0, 4/3, -16, 64]]), np.array([[1/4,0,0,0],[1/2,1/2,0,0],[3/4,1/2,1/2,0],[1, (195+3315**0.5)/260, (255-3315**0.5)/204, (60+3315**0.5)/104]]), np.array([[1/4,0,0,0],[2/4, -1/108, 0, 0], [3/4, 1/2, 1/4,0], [1, 52/45, 68/75,52/45]]))

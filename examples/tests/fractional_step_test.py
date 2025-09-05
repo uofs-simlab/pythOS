@@ -55,6 +55,21 @@ if enable_sundials:
     result = fs.fractional_step([f1, f2], 0.1, y0, 0, tf, 'Strang', {(2,): "EPI2", (1,): "RK4"}, epi_options={2: ('ARKODE_FEHLBERG_6_4_5', (1e-6,1e-8))},fname='epi_ARKODE.csv')
     output(verbose, 0.05, result, solution, "using EPI (ARKODE) solver")
 
+## EPIRK solvers
+result = fs.fractional_step([f1,f2], 0.01, y0, 0, tf, 'Strang', {(2,): "EPIRK3",(1,):"RK4"}, epi_options={2: ('kiops', 1e-10)}, fname='epirk.csv')
+output(verbose, 0.1, result, solution, "using EPIRK (kiops) solver")
+
+result = fs.fractional_step([f1,f2], 0.1, y0, 0, tf, 'Strang', {(2,): "EPIRK3",(1,): "RK4"},epi_options={2: ('RK45', (1e-6,1e-8))},fname='epirk_RK45.csv')
+output(verbose, 0.05, result, solution, "using EPIRK (RK45) solver")
+
+result = fs.fractional_step([f1,f2], 0.1, y0, 0, tf, 'Strang', {(2,): "EPIRK3",(1,): "RK4"},epi_options={2: ('Cash-Karp', (1e-6,1e-8))},fname='epirk_Cash-Karp.csv')
+output(verbose, 0.05, result, solution, "using EPIRK (Cash-Karp) solver")
+
+if enable_sundials:
+    result = fs.fractional_step([f1, f2], 0.1, y0, 0, tf, 'Strang', {(2,): "EPIRK3", (1,): "RK4"}, epi_options={2: ('ARKODE_FEHLBERG_6_4_5', (1e-6,1e-8))},fname='epirk_ARKODE.csv')
+    output(verbose, 0.05, result, solution, "using EPIRK (ARKODE) solver")
+
+
 ## Basic (complex) solvers
 result = fs.fractional_step([f1,f2], 0.1, y0, 0, tf, 'C4', methods={(2,): "SD2O3",(1,):"RK3"}, fname='split_complex.csv')
 
@@ -76,6 +91,16 @@ output(verbose, 0.05, result, solution, "using EPI (RK45) solver")
 
 result = fs.fractional_step([f1,f2], 0.1, y0, 0, tf, 'C4', {(2,): "EPI2",(1,): "RK4"},epi_options={2: ('Cash-Karp', (1e-6,1e-8))},fname='epi_Cash-Karp_complex.csv')
 output(verbose, 0.05, result, solution, "using EPI (Cash-Karp) solver")
+
+## EPIRK solvers
+result = fs.fractional_step([f1,f2], 0.1, y0, 0, tf, 'C4', {(2,): "EPIRK2",(1,):"RK4"}, epi_options={2: ('kiops', 1e-10)}, fname='epirk_complex.csv')
+output(verbose, 0.1, result, solution, "using EPIRK (kiops) solver")
+
+result = fs.fractional_step([f1,f2], 0.1, y0, 0, tf, 'C4', {(2,): "EPIRK2",(1,): "RK4"},epi_options={2: ('RK45', (1e-6,1e-8))},fname='epirk_RK45_complex.csv')
+output(verbose, 0.05, result, solution, "using EPIRK (RK45) solver")
+
+result = fs.fractional_step([f1,f2], 0.1, y0, 0, tf, 'C4', {(2,): "EPIRK2",(1,): "RK4"},epi_options={2: ('Cash-Karp', (1e-6,1e-8))},fname='epirk_Cash-Karp_complex.csv')
+output(verbose, 0.05, result, solution, "using EPIRK (Cash-Karp) solver")
 
     
 # Optionally plot the time series
@@ -99,11 +124,22 @@ if '-p' in sys.argv or '--plot' in sys.argv:
         'epi_RK45_complex.csv': "complex split with EPI (RK45) solver",
         'epi_Cash-Karp_complex.csv': "complex split with EPI (Cash-Karp) solver"
     }
+    epirk_labels = {
+        'epirk.csv': "split with EPIRK (kiops) solver",
+        'epirk_RK45.csv': "split with EPIRK (RK45) solver",
+        'epirk_Cash-Karp.csv': "split with EPIRK (Cash-Karp) solver",
+        'epirk_complex.csv': "complex split with EPIRK (kiops) solver",
+        'epirk_RK45_complex.csv': "complex split with EPIRK (RK45) solver",
+        'epirk_Cash-Karp_complex.csv': "complex split with EPIRK (Cash-Karp) solver"
+    }
+
     
     if enable_sundials:
         adaptive_labels["adaptive_CVODE_split.csv"] = 'split with CVODE solver'
         epi_labels['epi_ARKODE.csv'] = 'split with EPI (ARKODE) solver'
+        epirk_labels['epirk_ARKODE.csv'] = 'split with EPIRK (ARKODE) solver'
 
     plot('adaptive.csv', basic_labels, title='Basic Solvers',show=False)
     plot('adaptive.csv', adaptive_labels, title='Splits using Adaptive Solvers',show=False)
-    plot('adaptive.csv', epi_labels, title='Splits using EPI solvers')
+    plot('adaptive.csv', epi_labels, title='Splits using EPI solvers',show=False)
+    plot('adaptive.csv', epirk_labels, title='Splits using EPIRK solvers')

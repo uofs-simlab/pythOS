@@ -169,14 +169,20 @@ It takes as inputs:
 	- 'SDLstable' 2 stage, second order SDIRK method (Pareschi and Russo with x=(2 + sqrt(2))/2)
 	- 'SD3O3Lstable' 3 stage SDIRK method of order 3
 	- 'SD5O4' 5-stage SDIRK method of order 4
-	- EPI2 - 2nd order EPI method
-	- EPI3 - 3rd order EPI method
-	- EPI4 - 4th order EPI method
-	- EPI5 - 5th order EPI method
-	- EPI6 - 6th order EPI method
+	- EPI2 - 2nd order EPI (multistep) method 
+	- EPI3 - 3rd order EPI (multistep) method
+	- EPI4 - 4th order EPI (multistep) method
+	- EPI5 - 5th order EPI (multistep) method
+	- EPI6 - 6th order EPI (multistep) method
+	- EPIRK2 - 2nd order EPIRK method
+	- EPIRK3 - 3rd order EPIRK method
+	- EPIRK4 - 4th order EPIRK method
+	- EPIRK4s3 - 4th order EPIRK method
+	- EPIRK5s3 - 5th order EPIRK method (with 3 stages)
+	- EPIRK5s4 - 5th order EPIRK method (with 4 stages)
 	- If using Irksome, any of the `ButcherTableau` from Irksome may be used
 	
-	A user-defined method may also be used by supplying an instance of the `Tableau` class (found in `butcher_tableau.py`) or the `EPIMultistep` class (found in `Epi_multistep.py`) that represent the method.
+	A user-defined method may also be used by supplying an instance of the `Tableau` class (found in `butcher_tableau.py`), the `EPIMultistep` class (found in `Epi_multistep.py`) or the `EPIRKMethod` class (found in `EpiRKMethods.py`) that represent the method.
 
 Optional arguments are:
 
@@ -266,6 +272,20 @@ The `EmbeddedTableau` class is provided in the `butcher_tableau.py` file.  It ta
 - b : a 1 dimensional numpy array for b
 - b\_aux : a 1 dimensional numpy array with the embedded method
 - order : the lesser of the orders of the two methods, used in step size calculations
+
+#### EPI  methods
+
+There is the option of using exponential propagation iterative methods (EPI).  Because they are multistep methods, by default, they substep on each use, and reset the history after each solve interval.  
+If you wish to avoid resetting the history, the optional `monolithic` argument can be set to true (through the `solver_parameters` dictionary).  This is only recommended if the use is truly monolithic (i.e. no splitting is applied, and the step size is constant). To build the history, the initial steps are solved with a highly accurate adaptive method (relative tolerance=1e-10, absolute tolerance=1e-12).
+The number of substeps can be controlled with the `n_steps` optional argument (through the `solver_parameters` dictionary). The default number is 20.
+
+A new method may be created by creating an instance of the `EpiMultistep` class.  This takes as an argument an array `A`, representing the coefficients of the method. Note that this doesn't include the zeroed first row.  A single instance of the `EpiMultistep` class should not be used for two operator, because it also stores the previously computed values necessary for advancing the solution
+
+#### EPIRK  methods
+
+There is the option of using exponential propagation iterative methods of type Runge-Kutta (EPIRK).  
+
+A new method may be created by creating an instance of the `EpiRKMethod` class.  This takes as an argument arrays `p`, `g`, and `ab`.  Note that `ab` is an array containing the coefficients of a, and b in the last row.
 
 ### Additive Runge Kutta methods
 

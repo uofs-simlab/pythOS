@@ -69,6 +69,9 @@ def time_step(function, delta_t, y, initial_t,
                 y.assign(y + float(delta_t) * f)
         else:
             y+=delta_t*f
+    elif isinstance(tableau, tuple) and isinstance(tableau[0], EPIRKMethod):
+        tableau, info = tableau
+        y = tableau.step(function, initial_t, y, delta_t, info, **kwargs)
     elif isinstance(tableau, tuple) and isinstance(tableau[0], EpiMultistep):
         tableau, info = tableau
         y = tableau.solve(function, initial_t, y, delta_t, options=info, **kwargs)
@@ -192,9 +195,11 @@ def process_os_options(functions, initial_y, initial_t, delta_t, alpha, methods,
 
             if tableau in tableaus:
                 tableau=tableaus[tableau]   # matching RK method name with RK coefficients
+            elif tableau in epirk_methods:
+                tableau = epirk_methods[tableau]
             elif tableau in epi_methods:
                 tableau = EpiMultistep(epi_methods[tableau])
-            if isinstance(tableau, EpiMultistep):
+            if isinstance(tableau, EpiMultistep) or isinstance(tableau, EPIRKMethod):
                 if k+1 in epi_options:
                     info = epi_options[k+1]
                 elif 0 in epi_options:
@@ -932,4 +937,5 @@ adi_list=['MCS', 'HV', 'DR']
   
 
 from Epi_multistep import EpiMultistep, epi_methods
+from EpiRKMethods import EPIRKMethod, epirk_methods
 
