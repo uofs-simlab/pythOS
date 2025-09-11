@@ -11,7 +11,7 @@ Optional:
 
 - firedrake - for finite element capabilities
 - Irksome - for additional finite element capabilities
-- SUNDIALS (v7) - to use any of the sundials solvers for a subintegration
+- SUNDIALS (v7) - to use any of the sundials integrators for a subintegration
 
 ## Usage
 
@@ -44,7 +44,47 @@ cl /LD sundials_wrapper.c -I dependencies\install_sundials\include
 ```
 
 Then the sundials wrapper can be used in pythOS without any additional setup.
-### Fractional Step solver:
+
+### Basic structure of arguments
+
+All the integrators require some basic information:
+
+#### Operators
+
+Depending on the problem being solved and the integrators in use, the operators may take a few different formats:
+- functions with arguments (time, y vector) that returns another vector containing dydt
+- functions with arguments (time, y vector, Jacobian) that returns another vector containing dydt when the dynamic linearization option is enabled.
+- functions with arguments (time, y `Function`) that returns a `Function` representing dydt (for use with some options with the fractional step integrator only)
+- `Forms` representing the value of the operator (dydt) when using Firedrake
+- (`Form`, boundary condition) when a boundary condition is required
+- Irksome `Forms` which must contain any required `Dt` terms when using an Irksome integrator.
+- functions with arguments (time, delta t, y vector) that returns a vector for an analytical solution
+- functions with arguments (time, delta t, y `Function`) that returns a `Function` for an analytical solution
+- functions with arguments (time, y vector, dydt vector) that returns a residual vector for a solution using IDA
+
+Some of these options only work with some of the integrators and sub-integrator choices.  This will be further detailed in the sections for the relevant section
+
+#### Initial Condition
+
+This has two structures:
+- a numpy array (which should be 1-dimensional)
+- a Firedrake `Function` is required when finite element capabilities are used through Firedrake
+
+#### Time information
+
+Each integrator requires an initial time, final time and time step (delta t). These are all numeric values.  They may also be of type `Constant` if Firedrake is in use.
+Depending on the integrators used, the initial time and delta t value may need to be of type `Constant` for Firedrake.
+
+### Integrator Options
+
+To jump to the basic documentation for each integrator, use the links here:
+- [Fractional Step integrator](#fractional-step-integrator)
+- [Additive Runge Kutta integrator](#additive-runge-kutta-methods)
+- [General structure additive runge kutta methods](#general-structure-additive-runge-kutta-methods)
+- [Multirate methods](#multirate-methods)
+- [Multirate Infinitesimal methods](#infinitesimal-methods)
+
+### Fractional Step integrator
 
 The main function provided is `fractional_step`.
 
@@ -52,34 +92,21 @@ It takes as inputs:
 
 - the operators to use
      	 
-	these must be in a list in the order you wish to use them,
-	and each must be callable with arguments (t, y) and return a numpy 
-	array, unless using the finite element capabilities.
-	
-	If using firedrake for finite elements, these may be a function 
-	callable with arguments (t, y) and returning a `Function` if using 
-	only explicit Runge-Kutta methods for the operator. 
-	Otherwise, these must be Forms, or tuples containing Forms and boundary
-	conditions.  Note that if boundary conditions are supplied for the explicit
-	or EPI methods, the value must be the time derivative of the boundary 
-	condition.
-	
-	If using a solver from Irksome, the Form must include the 
-	appropriate Dt terms. Otherwise, the Form must not contain any 
-	Dt terms.
+	A list of operators (see [Operators](#operators)) in the order you wish to use them.
+
+	Note that the option of a function returning a `Function` will only work with explicit Runge-Kutta methods or analytic subintegration
+
+	If boundary conditions are supplied for explicit, adaptive or EPI methods, the value must be the time derivative of the boundary condition.
+
 	
 - delta_t
 
-	the time step to advance by, which may be an integer or a float, 
-	or a Constant.  If using the Irksome solvers, this must be a Constant.
+	the time step to advance by. If using the Irksome solvers, this must be a Constant.
+
 - initial_y
 
-	the initial value(s) to use for y
-	
-	this may be a single number or a 1-dimensional numpy array
-	
-	If using the finite element version, this must be of type Function
-	
+	the initial value(s) to use for y (see [Initial Condition](#initial-condition))
+		
 - initial_t
 
 	the time value to start at
@@ -88,53 +115,16 @@ It takes as inputs:
 - final_t
 
 	the time value to advance to
+
 - alpha
 
-	the operator splitting method to use
+	the fractional step method to use
 	
 	this may be a string for one of the pre-defined cases 
 	or a user-defined method
 	
-	The pre-defined 2-splitting methods are
-	- 'Godunov': aka Lie-Trotter method, 1st order
-	- 'SM2': Strang-Marchuk method, 2nd order, ABBA scheme
-	- 'Strang': Strang method, 2nd order, ABAB scheme
-	- 'AKOpt22': Auzinger-Ketcheson, optimized 2nd-order, 2-stage method that has minimized local error measure
-	    http://www.othmar-koch.org/splitting/
-	- 'OS22b': can take a parameter b and output a 2nd-order 2-stage method
-	- 'R3': Ruth, 3rd order
-	- 'C3': Chambers, 3rd order
-	- 'S3': Sornborger, 3rd order
-	- 'AKS3': Auzinger-Ketchenson-Suzuki, 3rd order
-	- 'AKS3C': Auzinger-Ketchenson-Suzuki with complex coefficients, 3rd order
-	- 'OS33bv1': can take a parameter b and output a 3nd-order 3-stage method
-	- 'OS33bv2': can take a parameter b and output a 3nd-order 3-stage method
-	- 'Y4': Yoshida, 4th order
-	- 'M4': McLachlan, 4th order
-	- 'B4': Blanes, 4th order
-	- 'C4': Chambers, 4th order
-	- 'AKS3P':
+	For further information, see [Pre-defined fractional step methods](docs/fractional_step.md#defined-fractional-step-methods) or [Defining a new fractional step method](docs/fractional_step.md#defining-a-new-fractional-step-method)
 
-    Some 3-spliting methods (ABC schemes):
-    - 'Godunov-3': Godunov for ABC scheme, 1st order
-    - 'Strang-3': Strang, 2nd order
-    - 'Y4-3': Yoshida, 4th order
-    - 'AK2s3i-3': Auzinger-Ketcheson 2nd-order 3-stage, ABC scheme v1, http://www.othmar-koch.org/splitting/
-    - 'AK2s3ii-3':Auzinger-Ketcheson 2nd-order 3-stage, ABC scheme v2, http://www.othmar-koch.org/splitting/
-    - 'AK2s5-3':Auzinger-Ketcheson 2nd-order 5-stage, ABC scheme, http://www.othmar-koch.org/splitting/
-	
-	Two N-split methods are also defined, which determine 
-	the appropriate number of operators based on the input 
-	list of operators.
-	- 'Godunov-N': Godunov for any number of operators
-	- 'Strang-N': Strang for any number of operators
-
-	To define a splitting method, the input is a list of lists.
-    The ith entry of the jth list defines the step size for the ith 
-	operator in the jth substep.
-	
-	If a substep need to happen with operators in the reverse order, 
-	add an element to the end of the list that is True.
 		   
 - methods
 	
@@ -144,171 +134,43 @@ It takes as inputs:
 	
 	The key (i,) will define the default for the ith operator to use if a method is not assigned to a particular substep
 	
-	The key (0,) will redefine a default to use if no method is assigned to a particular arc or operator
+	The key (0,) will redefine a default to use if no method is assigned to a particular substep or operator
 	
 	If none of the above are supplied, the default is forward Euler
+
+	There are a variety of built-in options, including [ANALYTIC](docs/fractional_step.md#analytic), [ADAPTIVE](docs/fractional_step.md#adaptive-methods), various [Runge-Kutta methods](docs/fractional_step.md#runge-kutta-methods), various [EPI methods](docs/fractional_step.md#epi-methods), various [EPIRK methods](docs/fractional_step.md#epirk-methods), and methods from [Irksome](docs/fractional_step.md#irksome)
+
+	User defined sub-integrators may also be supplied, of type [Runge-Kutta](docs/fractional_step.md#user-defined-runge-kutta-methods), [Adaptive Runge-Kutta](docs/fractional_step.md#user-defined-adaptive-methods), [EPI](docs/fractional_step.md#user-defined-epi-methods), and [EPIRK](docs/fractional_step.md#user-defined-epirk-methods)
+
 	
-	Built-in options are:
-	- ANALYTIC - an analytical solution (or solution using a solver not packaged in pythOS).  To use this, the corresponding operator must be a function that takes as arguments (dt, y) and returns the new solution
-	- ADAPTIVE - a solution using an adaptive method to meet some tolerance
-    - 'FE' forward Euler
-	- 'Heun' Heun's method
-	- 'RK3' the explicit Runge--Kutta of order 3
-	- 'RK4' the explicit Runge--Kutta of order 4
-	- 'BE' backward Euler
-	- 'SD2O2' 2-stage SDIRK method of order 2
-	- 'SD2O3' 2-stage SDIRK method of order 3
-	- 'SD3O4' 3-stage SDIRK method of order 4
-	- 'CN' Crank-Nicolson, also implicit trapezoidal 'IT'
-	- 'GL2' Gauss-Legendre of order 2, also implicit midpoint 'IM'
-	- 'GL4' Gauss-Legendre of order 4
-	- 'GL6' Gauss-Legendre of order 6
-	- 'SSP(5,4)'
-	- 'SSPRK3' Strong stability preserving RK3
-	- 'SDAstable' 2-stage, second order SDIRK method (Pareschi and Russo with x=1/2)
-	- 'SDLstable' 2 stage, second order SDIRK method (Pareschi and Russo with x=(2 + sqrt(2))/2)
-	- 'SD3O3Lstable' 3 stage SDIRK method of order 3
-	- 'SD5O4' 5-stage SDIRK method of order 4
-	- EPI2 - 2nd order EPI (multistep) method 
-	- EPI3 - 3rd order EPI (multistep) method
-	- EPI4 - 4th order EPI (multistep) method
-	- EPI5 - 5th order EPI (multistep) method
-	- EPI6 - 6th order EPI (multistep) method
-	- EPIRK2 - 2nd order EPIRK method
-	- EPIRK3 - 3rd order EPIRK method
-	- EPIRK4 - 4th order EPIRK method
-	- EPIRK4s3 - 4th order EPIRK method
-	- EPIRK5s3 - 5th order EPIRK method (with 3 stages)
-	- EPIRK5s4 - 5th order EPIRK method (with 4 stages)
-	- If using Irksome, any of the `ButcherTableau` from Irksome may be used
-	
-	A user-defined method may also be used by supplying an instance of the `Tableau` class (found in `butcher_tableau.py`), the `EPIMultistep` class (found in `Epi_multistep.py`) or the `EPIRKMethod` class (found in `EpiRKMethods.py`) that represent the method.
+Optional Arguments include options for:
+- [File Output](docs/fractional_step.md#file-output)
+- [Adaptive Fractional Step methods](docs/fractional_step.md#fractional-step-method-control)
+- [Dynamic Linearization](docs/fractional_step.md#dynamic-linearization)
+- [Boundary Conditions](docs/fractional_step.md#boundary-condition)
+- Additional control of the sub-integrators (see the relevant sections of the [Fractional Step documentation](docs/fractional_step.md) or a complete listing of [sub-integrator options](docs/fractional_step.md#options-to-control-sub-integrator-behaviour)).  
 
-Optional arguments are:
-
-- b: When using a splitting method which has a parameter, this is the value to use
-
-- fname: a filename to save intermediate results to.  
-  
-	 When using the finite element capabilities of firedrake this is a 
-	 .h5 file accessible through the `CheckpointFile` interface from 
-	 `firedrake`. The file has attributes `/times/idx/` that store the time 
-	 of each entry and the attribute `/time/last_idx` indicates the last 
-	 valid index. The `Function`s are stored using corresponding indices. 
-	 Otherwise this is a .csv file containing time in the first entry of each 
-	 line, and the solution in the remaining entries
-
-- save\_steps: the number of intermediate steps to save.  
-  
-	 The default is to save steps at delta\_t time interval if a filename
-	 is provided.
-
-- ivp\_methods: a dictionary to control the selection of the ADAPTIVE solver. 
-  
-	 Key `i` specified the method in use for the ith operator if it is solved 
-	 with an ADAPTIVE solver.  The entry has format 
-	 (method, relative tolerance, absolute tolerance).
-	 Available methods include:
-	 - any of the solvers from scipy.integrate.solve\_ivp
-	 - Dormand-Prince
-	 - Cash-Karp
-	 - Fehlberg
-	 - Bogacki-Shampine
-	 - Heun-Euler
-	 - If using SUNDIALS, `CV_ADAMS` and `CV_BDF` for a solver from CVOde,
-	 `IDA`, or any of the method strings for MRIStep, ERKStep or ARKStep.
-	 
-		 If using ARKStep, the method is a tuple specifying (implicit 
-		 tableau, explicit tableau), and the provided operator should 
-		 also be a tuple of (implicit operator, explicit operator), of 
-		 which either (tableau and operator) may be None. 
-		 When using MRIStep as an adaptive solver, the provided operator must 
-		 have form ((fast implicit, fast explicit), (slow implicit, slow 
-		 explicit)) with any of the operators optionally being None. 
-		 When using IDA as a solver, the operator must take arguments 
-		 (t, y, dydt) and return a residual.
-	 - any method not listed, by providing an instance of the `EmbeddedTableau` class found in `butcher_tableau.py`
-	 
-	When using firedrake, only the adaptive solvers implemented in pythOS 
-	are options (or a new method using the `EmbeddedTableau` class)
-
-- epi\_options: a dictionary to control the solver underlying the EPI methods.
-
-	The solver may either be kiops or an ODE integration.  The key i defines 
-	the solver to use for the ith operator if it uses an EPI method.  Entries 
-	have two forms:
-	- ('kiops', tol) to use kiops as the underlying solver
-	- (method, (rtol, atol)) - where method is the name of one of the of the integrators from
-		scipy.integrate.solve\_ivp, an implemented embedded pair, an instance 
-		of the `EmbeddedTableau` class, or `CV_BDF` or `CV_ADAMS` or method 
-		from ERKStep or ARKStep (with method specification as with the 
-		adaptive options for ARKODE).  This uses an ODE integration as the underlying solver.
-
-- os\_rtol: The relative tolerance for the splitting if using a method with 
-  step size control
-- os\_atol: The absolute tolerance for the splitting if using a method with
-  step size control
-
-- solver_parameters: A dictionary to provide optional arguments to the underlying solvers.
-
-- jacobian: A function to compute a jacobian when using dynamic linearization
-
-	If this option is used, the provided operator functions must take as arguments (t, y, J)
-
-- bc: Any boundary conditions to apply when using firedrake
-
-- stats: A boolean of whether to record stats about accepted or rejected splitting steps when using the splitting methods with adaptive step sizes.
-
-The `Tableau` class is provided in the file `butcher_tableau.py`.  It takes as inputs:
-
-- c : a 1 dimensional numpy array for c
-- a : a 2 dimensional numpy array for a
-- b : a 1 dimensional numpy array for b
-
-The `EmbeddedTableau` class is provided in the `butcher_tableau.py` file.  It takes as inputs:
-
-- c : a 1 dimensional numpy array for c
-- a : a 2 dimensional numpy array for a
-- b : a 1 dimensional numpy array for b
-- b\_aux : a 1 dimensional numpy array with the embedded method
-- order : the lesser of the orders of the two methods, used in step size calculations
-
-#### EPI  methods
-
-There is the option of using exponential propagation iterative methods (EPI).  Because they are multistep methods, by default, they substep on each use, and reset the history after each solve interval.  
-If you wish to avoid resetting the history, the optional `monolithic` argument can be set to true (through the `solver_parameters` dictionary).  This is only recommended if the use is truly monolithic (i.e. no splitting is applied, and the step size is constant). To build the history, the initial steps are solved with a highly accurate adaptive method (relative tolerance=1e-10, absolute tolerance=1e-12).
-The number of substeps can be controlled with the `n_steps` optional argument (through the `solver_parameters` dictionary). The default number is 20.
-
-A new method may be created by creating an instance of the `EpiMultistep` class.  This takes as an argument an array `A`, representing the coefficients of the method. Note that this doesn't include the zeroed first row.  A single instance of the `EpiMultistep` class should not be used for two operator, because it also stores the previously computed values necessary for advancing the solution
-
-#### EPIRK  methods
-
-There is the option of using exponential propagation iterative methods of type Runge-Kutta (EPIRK).  
-
-A new method may be created by creating an instance of the `EpiRKMethod` class.  This takes as an argument arrays `p`, `g`, and `ab`.  Note that `ab` is an array containing the coefficients of a, and b in the last row.
+For full details, see the complete [fractional step integrator documentation](docs/fractional_step.md)
 
 ### Additive Runge Kutta methods
 
-The `ark_solve` function takes as inputs:
+The main function provided is `ark_solve`
+
+It takes as inputs:
 
 - the operators to use
-     	 
-	these must be in a list in the order you wish to use them,
-	and each must be callable with arguments (t, y) and return a numpy 
-	array, unless using the finite element capabilities.
-	
-	If using firedrake for finite elements, these must be Forms.
+    
+	A list of operators (see [Operators](#operators)) in the order you wish to use them.
+
+	They must all either be functions returning arrays or all be Forms
+
 - dt
 
 	the time step to advance by, which may be an integer or a float
 
 - y0
 
-	the initial value(s) to use for y
-	
-	this may be a single number or a 1-dimensional numpy array
-	
-	If using the finite element version, this must be of type Function
+	the initial value(s) to use for y (see [Initial Condition](#initial-condition))
 
 - t0
 
@@ -324,66 +186,46 @@ The `ark_solve` function takes as inputs:
 	
 	Note any extra tableaus are ignored.  If there are fewer tableau than operators, no computation is performed.
 
-Optional arguments are:
+	See [Additive Runge Kutta method specification](docs/additive_rk.md#method-definition) for further details on how to define a method
 
-- fname: a filename to save intermediate results to.  
-  
-  
-	 When using the finite element capabilities of firedrake this is a 
-	 .h5 file accessible through the `CheckpointFile` interface from 
-	 `firedrake`. The file has attributes `/times/idx/` that store the time 
-	 of each entry and the attribute `/time/last_idx` indicates the last 
-	 valid index. The `Function`s are stored using corresponding indices. 
-	 Otherwise this is a .csv file containing time in the first entry of each 
-	 line, and the solution in the remaining entries
- 
-- save\_steps: the number of intermediate steps to save.  
-  
-	 The default is to save steps at delta\_t time interval if a filename
-	 is provided.
 
-- rtol: The relative tolerance to use if all supplied tableau are `EmbeddedTableau`
-- atol: The abolute tolerance to use if all supplied tableau are `EmbeddedTableau`
-- bc: Any boundary conditions to apply when using firedrake
+Optional Arguments include options for:
+- [File Output](docs/additive_rk.md#file-output)
+- [Adaptive methods](docs/additive_rk.md#adaptive-methods)
+- [Dynamic Linearization](docs/additive_rk.md#dynamic-linearization)
+- [Boundary Conditions](docs/additive_rk.md#boundary-condition)
+- [Additional control of solver behaviour](docs/additive_rk.md#controlling-solver-behaviour)
 
-- jacobian: A function to compute a jacobian when using dynamic linearization
-
-	If this option is used, the provided operator functions must take as arguments (t, y, J)
-	
-- solver_parameters: A dictionary to provide optional arguments to the underlying solvers.
-
+For full details, see the [Additive Runge Kutta documentation](docs/additive_rk.md)
 
 ### General structure additive runge kutta methods
 
-These are solved by converting the GARK structure to the ARK structure.
+These are integrated by converting the GARK structure to the ARK structure.
 
-The `gark_solve` function takes as inputs:
+The main function provided is `gark_solve`
+
+It takes as inputs:
 
 - the operators to use
-     	 
-	these must be in a list in the order you wish to use them,
-	and each must be callable with arguments (t, y) and return a numpy 
-	array, unless using the finite element capabilities.
-	
-	If using firedrake for finite elements, these must be Forms.
+    
+	A list of operators (see [Operators](#operators)) in the order you wish to use them.
+
+	They must all either be functions returning arrays or all be Forms
+
 - dt
 
 	the time step to advance by, which may be an integer or a float
 
 - y0
 
-	the initial value(s) to use for y
-	
-	this may be a single number or a 1-dimensional numpy array
-	
-	If using the finite element version, this must be of type Function
+	the initial value(s) to use for y (see [Initial Condition](#initial-condition))
 
-- initial_t
+- t0
 
 	the time value to start at
 	
 	If using the finite element version, this must be of type Constant
-- final_t
+- tf
 
 	the time value to advance to
 
@@ -395,129 +237,73 @@ The `gark_solve` function takes as inputs:
 	
 	a list containing the vectors b{i} defining the method, each as a numpy array
 
-Optional arguments are:
+Optional Arguments include options for:
+- [Reordering the method](docs/generalized_additive_rk.md#method-reordering)
+- [File Output](docs/generalized_additive_rk.md#file-output)
+- [Dynamic Linearization](docs/generalized_additive_rk.md#dynamic-linearization)
+- [Boundary Conditions](docs/generalized_additive_rk.md#boundary-condition)
+- [Additional control of solver behaviour](docs/generalized_additive_rk.md#controlling-solver-behaviour)
 
-- fname: a filename to save intermediate results to.  
-  
-	 When using the finite element capabilities of firedrake this is a 
-	 .h5 file accessible through the `CheckpointFile` interface from 
-	 `firedrake`. The file has attributes `/times/idx/` that store the time 
-	 of each entry and the attribute `/time/last_idx` indicates the last 
-	 valid index. The `Function`s are stored using corresponding indices. 
-	 Otherwise this is a .csv file containing time in the first entry of each 
-	 line, and the solution in the remaining entries
-
-- save\_steps: the number of intermediate steps to save.  
-  
-	 The default is to save steps at delta\_t time interval if a filename
-	 is provided.
-
-- bc: Any boundary conditions to apply when using firedrake
-
-- jacobian: A function to compute a jacobian when using dynamic linearization
-
-	If this option is used, the provided operator functions must take as arguments (t, y, J)
-	
-- solver_parameters: A dictionary to provide optional arguments to the underlying solvers.
-
+For full details, see the [Generalized Additive Runge Kutta documentation](docs/generalized_additive_rk.md)
 
 ### Multirate methods
+
+The multirate methods are integrated by converting to the GARK structure which is then converted to the ARK structure.  The method will be reordered to avoid implicit solves where possible.
 
 The `multirate_solve` function takes as inputs:
 
 - y0
 
-	the initial value(s) to use for y
-	
-	this may be a single number or a 1-dimensional numpy array
-	
-	If using the finite element version, this must be of type Function
+	the initial value(s) to use for y (see [Initial Condition](#initial-condition))
 
 - t0
 
 	the time value to start at
 	
 	If using the finite element version, this must be of type Constant
+
 - dt
 
 	the time step to advance by, which may be an integer or a float
+
 
 - tf
 
 	the time value to advance to
 
 - method
-	
-	an instance of the `Multirate` class defining the method to use
-
+	The method to use, which is of type `Multirate`.  See [Multirate Method Definition](docs/multirate.md#method-definition) for further information on defining the method
 - M
-    the number of fast steps per slow step
-
+	the ratio of fast steps to slow steps, which must be an integer
 - fs
-
-	The slow operator
-	
+	the slow operator (see [Operators](#operators))
 - ff
+	the fast operator (see [Operators](#operators))
 	
-	The fast operator
-	
-For each of the operators, they must be callable with arguments (t, y) and return a numpy array, unless using the finite element capabilities.
+Optional Arguments include options for:
+- [Reordering the method](docs/multirate.md#method-reordering)
+- [File Output](docs/multirate.md#file-output)
+- [Dynamic Linearization](docs/multirate.md#dynamic-linearization)
+- [Boundary Conditions](docs/multirate.md#boundary-condition)
+- [Additional control of solver behaviour](docs/multirate.md#controlling-solver-behaviour)
 
-If using the finite element capabilities, the operators must be Forms.
+For full details, see the [Multirate documentation](docs/multirate.md)
 
-Optional arguments:
-
-- fname: a filename to save intermediate results to.  
-  
-	 When using the finite element capabilities of firedrake this is a 
-	 .h5 file accessible through the `CheckpointFile` interface from 
-	 `firedrake`. The file has attributes `/times/idx/` that store the time 
-	 of each entry and the attribute `/time/last_idx` indicates the last 
-	 valid index. The `Function`s are stored using corresponding indices. 
-	 Otherwise this is a .csv file containing time in the first entry of each 
-	 line, and the solution in the remaining entries
-
-- save\_steps: the number of intermediate steps to save.  
-  
-	 The default is to save steps at delta\_t time interval if a filename
-	 is provided.
-
-
-- solver\_parameters: A dictionary to provide optional arguments to the underlying solvers.
-
-- bcs: Any Dirichlet boundary conditions to apply in the finite element version.
-
-
-For convienience, a predefined multirate method is provided.  It is:
-
-- mrgark\_ex2_im2 - Sarshar, Roberts and Sandu (2019) MrGARK EX2-IM2 2(1)[A]
-
-The `Multirate` class takes as inputs:
-
-- A_ff - a 2D numpy array
-- A_ss - a 2D numpy array
-- b_f - a 1D numpy array
-- b_s - a 1D numpy array
-- A_fs - a function with arguments (lambda, M) that returns a 2D numpy array
-- A_sf - a function with arguments (lambda, M) that returns a 2D numpy array
-
-#### Infinitesimal methods
+### Multirate Infinitesimal methods
 
 The `multirate_infinitesimal_solve` function takes as inputs:
 
+
 - y0
 
-	the initial value(s) to use for y
-	
-	this may be a single number or a 1-dimensional numpy array
-	
-	If using the finite element version, this must be of type Function
+	the initial value(s) to use for y (see [Initial Condition](#initial-condition))
 
 - t0
 
 	the time value to start at
 	
 	If using the finite element version, this must be of type Constant
+
 - dt
 
 	the time step to advance by, which may be an integer or a float
@@ -527,75 +313,28 @@ The `multirate_infinitesimal_solve` function takes as inputs:
 	the time value to advance to
 
 - method
-	
-	an instance of the `Multirate_Infinitesimal` class defining the method to use
-	
+	The method to use, which is of type `Multirate_Infinitesimal`.  See [Multirate Infinitesimal Methods](docs/multirate_infinitesimal.md#method-definition) for more details
 - fi
+	the slow operator (see [Operators](#operators))
+	If two slow operators are in use, this is the implicit operator
 
-	The slow operator.  If the method is IMEX at the slow scale, this is the implicit slow operator.
-	
 - ff
-	
-	The fast operator
+	the fast operator (see [Operators](#operators))
 
 - fe (optional)
-
-	The explicit slow operator for methods that are IMEX at the slow scale.
-	
-For each of the operators, they must be callable with arguments (t, y) and return a numpy array, unless using the finite element capabilities.
-
-If using the finite element capabilities, the operators must be Forms.
-
-Optional arguments:
-
-- fname: a filename to save intermediate results to.  
-  
-	 When using the finite element capabilities of firedrake this is a 
-	 .h5 file accessible through the `CheckpointFile` interface from 
-	 `firedrake`. The file has attributes `/times/idx/` that store the time 
-	 of each entry and the attribute `/time/last_idx` indicates the last 
-	 valid index. The `Function`s are stored using corresponding indices. 
-	 Otherwise this is a .csv file containing time in the first entry of each 
-	 line, and the solution in the remaining entries
-
-- save\_steps: the number of intermediate steps to save.  
-  
-	 The default is to save steps at delta\_t time interval if a filename
-	 is provided.
-
-- ivp\_options: a dictionary of arguments to pass to the adaptive solver.
-	
-	This includes the tolerances, which have default values of rtol=1e-10 and atol=1e-12
-
-- ivp\_method: the adaptive solver to use.
-
-	The default is RK45 from scipy for the non-finite element version, and 
-	Dormand-Prince from the pythOS collection for the finite element version.
-
-- implicit\_solve\_options: A dictionary to provide optional arguments to the underlying solvers.
-
-- bcs: Any Dirichlet boundary conditions to apply in the finite element version.
+	the slow explicit operator if two slow operators are in use (see [Operators](#operators))
 
 
-For convienience, some predefined multirate infinitesimal methods are provided.  These are:
+Optional arguments may be used for:
+- [File Output](docs/multirate_infinitesimal.md#file-output)
+- [Boundary Conditions](docs/multirate_infinitesimal.md#boundary-condition)
+- [Controlling implicit and adaptive stages](docs/multirate_infinitesimal.md#controlling-solver-behaviour)
 
-- mri\_kw3 - Knoth and Wolke (1997) order 3
-- mri\_erk2a - Sandu (2019) mri-gark-erk22a
-- mri\_erk2b - Sandu (2019) mri-gark-erk22b
-- mri\_erk3 - Sandu (2019) mri-gark-erk33
-- mri\_erk4 - Sandu (2019) mri-gark-erk45a
-- mri\_irk2 - Sandu (2019) mri-gark-irk21a
-- mri\_esdirk3a - Sandu (2019) mri-gark-esdirk34a
-- mri\_sdirk3 - Sandu (2019) mri-gark-sdirk33a
-- mri\_imex3 - Chinomona and Reynolds (2021) imex-mri-gark3a
-- mri\_imex4 - Chinomona and Reynolds (2021) imex-mri-gark4
 
-The `Multirate_Infinitesimal` class takes as inputs:
-
-- c - A 1D numpy array
-- gamma - A 2D numpy array defining the coupling
-- omega (optional) - A 2D numpy array defining the coupling with the second slow operator.
+For full details, see the [Multirate Infinitesimal documentation](docs/multirate_infinitesimal.md)
 
 ## Testing Examples
 
 There are a small set of tests available under `examples/tests/`.  There is more complete documentation [here](examples/tests/README.md)
+
+There are also a number of examples demonstrating how to set up problems and use various integrators documented in the [examples directory](examples/Readme.md)
