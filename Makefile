@@ -1,6 +1,8 @@
-SUNDIALS_INCLUDE_DIR=~/simlab/sundials_install/include/
+SUNDIALS_INSTALL_DIR=sundials_install/
+
+SUNDIALS_LIB_DIR=lib
 
 all: sundials_wrapper.so
 
 sundials_wrapper.so: sundials_wrapper.c
-	gcc -shared -o sundials_wrapper.so sundials_wrapper.c -I$(SUNDIALS_INCLUDE_DIR) -lsundials_core -L$(SUNDIALS_INCLUDE_DIR)/../lib
+	gcc -shared -o sundials_wrapper.so sundials_wrapper.c -I$(SUNDIALS_INSTALL_DIR)/include -lsundials_core -L$(SUNDIALS_INCLUDE_DIR)/$(SUNDIALS_LIB_DIR)

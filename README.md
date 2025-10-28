@@ -35,7 +35,7 @@ set PYTHONPATH=%CD%;%PYTHONPATH%
 
 If using SUNDIALS, prior to use, the wrapper library must be built.
 
-On Unix systems, a Makefile is provided to build the wrapper.  Both the wrapper and the SUNDIALS lib folder must be in the `LD_LIBRARY_PATH`.
+On Unix systems, a Makefile is provided to build the wrapper.  To use the Makefile, the `SUNDIALS_INSTALL_DIR` should be set to the location SUNDIALS was installed, and the `SUNDIALS_LIB_DIR` should be set to the name of the library folder within the `SUNDIALS_INSTALL_DIR`. Both the wrapper and the SUNDIALS lib folder must be in the `LD_LIBRARY_PATH`.
 
 On Windows systems, the build has been tested using the Visual Studio build tools. The pythOS wrapper code expects the SUNDIALS library to be installed in a dependencies/install_sundials sub-directory.  Following this, the wrapper can be built with
 
