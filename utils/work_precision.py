@@ -51,7 +51,10 @@ def test_additive_rk(f_list,t0,tf,y0,tableaus,dt0,reference_solution,num_time_re
         dt = dt / 2
         if (dt < dt_min):
             break
-        result = ark_solve(f_list,dt,y0,t0,tf,tableaus,**kwargs)
+        try:
+            result = ark_solve(f_list,dt,y0,t0,tf,tableaus,**kwargs)
+        except:
+            continue
         error = calc_error(result,reference_solution)
         if error < err_max:
             err.append(error)
@@ -72,7 +75,10 @@ def test_gark(f_list,t0,tf,y0,A,b,dt0,reference_solution,num_time_repeats=0,N=8,
         dt = dt / 2
         if (dt < dt_min):
             break
-        result = gark_solve(f_list,dt,y0,t0,tf,A,b,**kwargs)
+        try:
+            result = gark_solve(f_list,dt,y0,t0,tf,A,b,**kwargs)
+        except:
+            continue
         error = calc_error(result,reference_solution)
         if error < err_max:
             err.append(error)
