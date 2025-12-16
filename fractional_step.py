@@ -89,7 +89,7 @@ def time_step(function, delta_t, y, initial_t,
 def time_step_analytic(function, delta_t, y, initial_t):
     # this function takes the analytic solution of the DE and returns it.
     # Only used when we want to use analytic solution for each sub-integrators (or use a user-defined custom solver)
-    f = function(delta_t,y)   
+    f = function(initial_t,delta_t,y)   
     if isinstance(y, Function):
         y.assign(f)
         return y
@@ -439,7 +439,7 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
                     else:
                         ti = t + start_time2
                     
-                    y2 = time_step(function2, step2, y2, ti, tableau, params=params, restore=True)
+                    y2 = time_step(function2, step2, y2, ti, tableau, **params, restore=True)
                     
                     if isinstance(initial_t, Constant):
                         initial_t.assign(t0)
