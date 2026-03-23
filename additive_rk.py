@@ -32,7 +32,10 @@ def ark_step(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control=False, orde
             Y = sol.x.view(y0.dtype)
 
             for j in range(len(f)):
-                ki[j,:,i] = f[j](t0 + step *methods[j]._c[i], Y, *args)
+                if methods[j]._evaluations[i]:
+                    ki[j,:,i] = f[j](t0 + step *methods[j]._c[i], Y, *args)
+                else:
+                    ki[j,:,i] = y0 # all multiplying factors are zero, so no need to evaluate
         y_out = y0 + step * sum([np.dot(ki[i], methods[i]._b) for i in range(len(f))])
         if control:
             y_err = y0 + step * sum([np.dot(ki[i], methods[i].b_aux) for i in range(len(f))])
@@ -42,6 +45,47 @@ def ark_step(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control=False, orde
         else:
             accept = True
     return step, step_old, y_out
+
+def ark_step_explicit(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control=False, order=None, J=None, **kwargs):
+    """
+    Take a step in time using an additive runge kutta method.
+    This function assumes at least one component method is implicit, but none are fully implicit (i.e. at least one method is a dirk method)
+    """
+    ki = np.zeros((len(f), np.size(y0), methods[0]._b.size), dtype = y0.dtype)
+    accept = False
+    step_old = step
+    if J is not None:
+        args = (J,)
+    else:
+        args = ()
+    if 'method' not in kwargs:
+        kwargs['method'] = 'krylov'
+    
+    while not accept:
+        for i in range(methods[0]._b.size):
+            # sol = root(root_func, y0.view(np.float64), args = (f, step, y0, t0, methods, ki, i, args), **kwargs)
+            Y = y0 + step * sum([np.dot(ki[j], methods[j]._a[i]) for j in range(len(f))])
+
+            # if not sol.success:
+                # print(sol.message)
+                # print(np.max(abs(sol.fun)))
+            # Y = sol.x.view(y0.dtype)
+
+            for j in range(len(f)):
+                if methods[j]._evaluations[i]:
+                    ki[j,:,i] = f[j](t0 + step *methods[j]._c[i], Y, *args)
+                else:
+                    ki[j,:,i] = y0 # all multiplying factors are zero, so no need to evaluate
+        y_out = y0 + step * sum([np.dot(ki[i], methods[i]._b) for i in range(len(f))])
+        if control:
+            y_err = y0 + step * sum([np.dot(ki[i], methods[i].b_aux) for i in range(len(f))])
+            accept, err = measure_error(y0, y_out, y_err, rtol, atol)
+            step_old = step
+            step = compute_time(err, order, step_old)
+        else:
+            accept = True
+    return step, step_old, y_out
+
 
 def ark_step_implicit(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control=False, order=None, J = None, **kwargs):
     """
@@ -72,7 +116,10 @@ def ark_step_implicit(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control=Fa
         for i in range(methods[0]._b.size):
             y = Y[i*N:(i+1)*N]
             for j in range(len(f)):
-                ki[j,:,i] = f[j](t0 + step *methods[j]._c[i], y, *args)
+                if methods[j]._evaluations[i]:
+                    ki[j,:,i] = f[j](t0 + step *methods[j]._c[i], Y, *args)
+                else:
+                    ki[j,:,i] = y0 # all multiplying factors are zero, so no need to evaluate
         y_out = y0 + step * sum([np.dot(ki[i], methods[i]._b) for i in range(len(f))])
         if control:
             y_err = y0 + step * sum([np.dot(ki[i], methods[i].b_aux) for i in range(len(f))])
@@ -131,8 +178,10 @@ def ark_step_fem(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control = False
             solve(F2 == 0, Y, bcs=bc, solver_parameters=solver_parameters)
             for j in range(len(f)):
                 ki[j][i] = Function(y0)
-                F2 = inner(ki[j][i], test_f) * dx - replace(f[j], {y0: Y, t0: ts + methods[j]._c[i] * step})
-                solve(F2 == 0, ki[j][i])
+                if (methods[j]._evaluations[i]):
+                    F2 = inner(ki[j][i], test_f) * dx - replace(f[j], {y0: Y, t0: ts + methods[j]._c[i] * step})
+                    solve(F2 == 0, ki[j][i])
+
         y_out = Function(y0)
         for i in range(methods[0]._b.size):
             for f_ind in range(len(f)):
@@ -232,6 +281,10 @@ def ark_step_implicit_fem(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, contro
                 ki[j][i] = Function(y0)
                 F2 = inner(ki[j][i], test_f) * dx - replace(f[j], {y0: y_out[i], t0: t0 + methods[j]._c[i] * step})
                 solve(F2 == 0, ki[j][i])
+                if (methods[j]._evaluations[i]):
+                    F2 = inner(ki[j][i], test_f) * dx - replace(f[j], {y0: y_out[i], t0: t0 + methods[j]._c[i] * step})
+                    solve(F2 == 0, ki[j][i])
+                
         y_out = Function(y0)
         for i in range(methods[0]._b.size):
             for f_ind in range(len(f)):
@@ -251,6 +304,52 @@ def ark_step_implicit_fem(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, contro
             accept = True
     y0.assign(y_out)
     return step, step_old, y0
+
+def ark_step_fem_explicit(f, step, y0, t0, methods, rtol=1e-3, atol=1e-6, control = False, order=None, bc=None, **kwargs):
+    ki = [[None for _ in range(methods[0]._b.size)] for _ in range(len(f))]
+    accept = False
+    step_old = step
+    test_f = f[0].arguments()[0]
+    f_list = []
+    for fi in f:
+        tf = fi.arguments()[0]
+        f_list.append(replace(fi, {tf: test_f}))
+    f = f_list
+    ts = Constant(t0)
+
+    while not accept:
+        for i in range(methods[0]._b.size):
+            Y = Function(y0)
+            for j in range(i):
+                for f_ind in range(len(f)):
+                    if methods[f_ind]._a[i,j] != 0:
+                        Y = Y + float(methods[f_ind]._a[i,j] * step) * ki[f_ind][j]
+            for j in range(len(f)):
+                ki[j][i] = Function(y0)
+                # We only need to evaluate if there is a non-zero entry in the row/column
+                if (methods[j]._evaluations[i]):
+                    F2 = inner(ki[j][i], test_f) * dx - replace(f[j], {y0: Y, t0: ts + methods[j]._c[i] * step})
+                    solve(F2 == 0, ki[j][i])
+        y_out = Function(y0)
+        for i in range(methods[0]._b.size):
+            for f_ind in range(len(f)):
+                if methods[f_ind]._b[i] != 0:
+                    y_out += step * ki[f_ind][i] * float(methods[f_ind]._b[i])
+
+        if control:
+            y_err = Function(y0)
+            for i in range(methods[0]._b.size):
+                for f_ind in range(len(f)):
+                    if methods[f_ind].b_aux[i] != 0:
+                        y_err += step * ki[f_ind][i] * float(methods[f_ind].b_aux[i])
+            accept, err = measure_error(y0, y_out, y_err, rtol, atol)
+            step_old = step
+            step = compute_time(err, order, step_old)
+        else:
+            accept = True
+    y0.assign(y_out)
+    return step, step_old, y0
+
 
 
 def ark_solve(functions, dt, y0, t0, tf, methods, rtol=1e-3, atol=1e-6, bc=None, solver_parameters={}, fname=None, save_steps = 0, jacobian = None):
@@ -287,21 +386,28 @@ def ark_solve(functions, dt, y0, t0, tf, methods, rtol=1e-3, atol=1e-6, bc=None,
 
     # determine if the fully implicit solver is needed and if step size control is being used
     fully_implicit = False
+    fully_explicit = True
     order = np.inf
     control = True
     for method in methods:
         if np.any(np.triu(method._a, 1)!=0):
             fully_implicit = True
+        if np.any(np.triu(method._a)!=0):
+            fully_explicit = False
         if not isinstance(method, EmbeddedTableau):
             control = False
         else:
             order = min(order, method.order)
     step = ark_step
+    if fully_explicit:
+        step = ark_step_explicit
     if fully_implicit:
         step = ark_step_implicit
     if isinstance(y0, Function):
         if fully_implicit:
             step = ark_step_implicit_fem
+        if fully_explicit:
+            step = ark_step_fem_explicit
         else:
             step = ark_step_fem
         fem = True

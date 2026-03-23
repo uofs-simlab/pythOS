@@ -54,6 +54,45 @@ def gark_solve(f, dt, y0, t0, tf, A, b, bc=None, solver_parameters={}, fname=Non
     if len(f) > len(b):
         print("ERROR: not enough tableau provided")
         return
+    if order is None:
+        dependencies = [[] for _ in range(sum([x.size for x in b]))]
+        k = 0
+        j = 0
+        prefix = [sum([bi.size for bi in b[:i]]) for i in range(len(b))]
+        for i in range(len(dependencies)):
+            for (idx, block) in enumerate(A[k]):
+                for ll in range(block[j,:].size):
+                    if not np.isclose(block[j,ll],0):
+                        dependencies[i].append(prefix[idx]+ll)
+            j += 1
+            if j >= A[k][0].shape[1]:
+                k += 1
+                j = 0
+        order = []
+        used = set()
+        while (len(order) < len(dependencies)):
+            test_idx = 0
+            found = False
+            while test_idx < len(dependencies):
+                if test_idx in used:
+                    test_idx += 1
+                    continue
+                diagonal = True
+                for idx in dependencies[test_idx]:
+                    if idx not in used and idx != test_idx:
+                        diagonal = False
+                        break
+                if diagonal:
+                    order.append(test_idx)
+                    used.add(test_idx)
+                    found = True
+                test_idx += 1
+            if not found:
+                test_idx = 0
+                while test_idx < len(dependencies):
+                    if test_idx not in used:
+                        order.append(test_idx)
+                    test_idx += 1
 
     tableaus = gark_convert(A, b, order)
 

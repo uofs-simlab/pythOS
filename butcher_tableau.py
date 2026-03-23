@@ -19,6 +19,8 @@ class Tableau:
         self._sizeb=b.size
         self._sdirk = not self._explicit and np.all(np.equal(np.triu(a,1),0)) and np.all(np.isclose(np.diag(a), a[0,0]))
         self._implicit=not self._sdirk and not self._explicit
+        self._evaluations = [not (np.all(np.isclose(a[:,i],0)) and np.isclose(b[i],0)) for i in range(b.size)]
+
         if self._implicit:
             try:
                 self._Ainv = np.linalg.inv(self._a)
@@ -37,8 +39,11 @@ class Tableau:
         x_values=step*self._c+current_x
         next=np.zeros((np.size(current_y),self._sizeb), current_y.dtype)
         for i in range(np.size(self._b)):
-            k=function(x_values[i], current_y+step*np.dot(next, self._a[i]))
-            next[:,i]=k
+            if self._evaluations[i]:
+                k=function(x_values[i], current_y+step*np.dot(next, self._a[i]))
+                next[:,i]=k
+            else:
+                next[:,i] = 0
         return next
     
     def get_k_implicit(self, function, current_y, current_x,
@@ -71,7 +76,10 @@ class Tableau:
         k_i = np.zeros(Y.shape, current_y.dtype)
         
         for i in range(self._sizeb):
-            k_i[:,i] = function(current_x + step * self._c[i], Y[:,i])
+            if self._evaluations[i]:
+                k_i[:,i] = function(current_x + step * self._c[i], Y[:,i])
+            else:
+                k_i[:,i] = 0
 
         return k_i
 
@@ -101,10 +109,11 @@ class Tableau:
             if k.dtype == np.complex128:
                 sol_x = sol_x.view(np.complex128)
 
-            k[:,i]=function(x[i], sol_x)
+            if self._evaluations[i]:
+                k[:,i]=function(x[i], sol_x)
         return k
 
-    def get_k_values(self, function, current_y, current_x, step, bc=None, params=None):
+    def get_k_values(self, function, current_y, current_x, step, bc=None, params=None, **kwargs):
         """Return the k values (slopes) for the next step of the solution"""
         if isinstance(function, tuple) or isinstance(current_y, Function):
             if isinstance(function, tuple):
@@ -134,11 +143,11 @@ class Tableau:
                 g = f[1][1]
                 f = f[0]
             if self._explicit:
-                k = self.k_erk_fem(f, current_y, current_x, step, test_f, bcs=bcs, params = params)
+                k = self.k_erk_fem(f, current_y, current_x, step, test_f, bcs=bcs, **kwargs)
             elif self._sdirk:
-                k = self.k_dirk_fem(f, current_y, current_x, step, test_f, bcs=bcs, params = params, M=M)
+                k = self.k_dirk_fem(f, current_y, current_x, step, test_f, bcs=bcs, M=M, **kwargs)
             else:
-                k = self.k_irk_fem(f, current_y, current_x, step, test_f, bcs=bcs, params=params, M=M)
+                k = self.k_irk_fem(f, current_y, current_x, step, test_f, bcs=bcs, M=M, **kwargs)
             current_y.assign(y_s)
             return k
                 
@@ -150,7 +159,7 @@ class Tableau:
             return self.get_k_implicit(function, current_y, current_x, step)
 
 
-    def k_erk_fem(self, F, y0, t, dt, test_f, bcs=None, params={}):
+    def k_erk_fem(self, F, y0, t, dt, test_f, bcs=None, **kwargs):
         ki = [None for _ in range(self._sizeb)]
         t_0 = Constant(t)
         for i in range(self._sizeb):
@@ -159,22 +168,22 @@ class Tableau:
             t.assign(t_0 + dt * self._c[i])
             for j in range(i):
                 if self._a[i,j] != 0:
-                    yi += float(self._a[i,j]) * ki[j] * dt
-            
-            if isinstance(F, Form):
-                F2 = inner(ki[i], test_f) * dx - F
+                    yi += self._a[i,j] * ki[j] * dt
+            if self._evaluations[i]:
+                if isinstance(F, Form):
+                    F2 = inner(ki[i], test_f) * dx - F
 
-                #if bcs is not None:
-                #    bcs.apply(yi)
-                solve(replace(F2, {y0: yi}) == 0,  ki[i],
-                      bcs=bcs,
-                      solver_parameters=params)
-            else:
-                ki[i] = F(t, yi)
+                    #if bcs is not None:
+                    #    bcs.apply(yi)
+                    solve(replace(F2, {y0: yi}) == 0,  ki[i],
+                          bcs=bcs,
+                          **kwargs)
+                else:
+                    ki[i] = F(t, yi)
         t.assign(t_0)
         return ki
     
-    def k_dirk_fem(self, F, y0, t, dt, test_f, bcs=None, M = 1, params={}):
+    def k_dirk_fem(self, F, y0, t, dt, test_f, bcs=None, M = 1, **kwargs):
         ki = [None for _ in range(self._sizeb)]
         t0 = Constant(t)
         y_s = Function(y0)
@@ -182,20 +191,21 @@ class Tableau:
             yi = Function(y_s)
             for j in range(i):
                 if self._a[i,j] != 0:
-                    yi += dt * float(self._a[i,j]) * ki[j]
-            F2 = inner((y0 - yi) / (dt * float(self._a[i,i])), M * test_f) * dx - F
+                    yi += dt * self._a[i,j] * ki[j]
+            F2 = inner((y0 - yi) / (dt * self._a[i,i]), M * test_f) * dx - F
             t.assign(dt * self._c[i] + t0)
-            solve(F2 == 0, y0, bcs=bcs, solver_parameters=params)
+            solve(F2 == 0, y0, bcs=bcs, **kwargs)
             ki[i] = Function(y_s)
-            if self._a[i,i] != 0:
-                ki[i].assign((y0 - yi) / dt / float(self._a[i,i]))
-            else:
-                F2=inner(ki[i], test_f) * dx - F
-                solve(F2 == 0, ki[i])
+            if self._evaluations[i]:
+                if self._a[i,i] != 0:
+                    ki[i].assign((y0 - yi) / dt / self._a[i,i])
+                else:
+                    F2=inner(ki[i], test_f) * dx - F
+                    solve(F2 == 0, ki[i])
         t.assign(t0)
         return ki
 
-    def k_irk_fem(self, F, y0, t, dt, test_f, bcs=None, M = 1, params={}):
+    def k_irk_fem(self, F, y0, t, dt, test_f, bcs=None, M = 1, **kwargs):
         Vbig = y0.function_space()
         N = len(y0.function_space())
         for i in range(1, self._sizeb):
@@ -252,7 +262,7 @@ class Tableau:
                         new_bcs.append(DirichletBC(Vbi(j), bc.function_arg.copy(deepcopy=True), bc.sub_domain))
                     else:
                         new_bcs.append(DirichletBC(Vbi(j), 0, bc.sub_domain))
-        solve(Fnew == 0, yis, bcs=new_bcs, solver_parameters=params)
+        solve(Fnew == 0, yis, bcs=new_bcs, **kwargs)
         y_out = []
 
         for j in range(self._sizeb):
@@ -266,16 +276,19 @@ class Tableau:
 
         kis = []
         for j in range(self._sizeb):
-            if self._Ainv is not None:
-                kis.append(Function(y0))
-                kis[-1].assign(0)
-                for i in range(self._sizeb):
-                    kis[-1].assign(kis[-1] + (y_out[i] - y0)/dt * self._Ainv[j, i])
+            if self._evaluations[i]:
+                if self._Ainv is not None:
+                    kis.append(Function(y0))
+                    kis[-1].assign(0)
+                    for i in range(self._sizeb):
+                        kis[-1].assign(kis[-1] + (y_out[i] - y0)/dt * self._Ainv[j, i])
+                else:
+                    t.assign(t0 + dt * self._c[j])
+                    kis.append(Function(y0))
+                    F2 = inner(kis[j], test_f) * dx - replace(F, {y0: y_out[j]})
+                    solve(F2 == 0, kis[j])
             else:
-                t.assign(t0 + dt * self._c[j])
-                kis.append(Function(y0))
-                F2 = inner(kis[j], test_f) * dx - replace(F, {y0: y_out[j]})
-                solve(F2 == 0, kis[j])
+                kis[j] = Function(y0)
 
         t.assign(t0)
         return kis
@@ -295,14 +308,15 @@ class Tableau:
         else:
             test_f = None
         if self._explicit:
-            ki = self.k_erk_fem(F, y0, t, dt, test_f, bcs, params)
+            ki = self.k_erk_fem(F, y0, t, dt, test_f, bcs, **params)
         elif self._sdirk:
-            ki = self.k_dirk_fem(F, y0, t, dt, test_f, bcs, M, params)
+            ki = self.k_dirk_fem(F, y0, t, dt, test_f, bcs, M, **params)
         else:
-            ki = self.k_irk_fem(F, y0, t, dt, test_f, bcs, M, params)
+            ki = self.k_irk_fem(F, y0, t, dt, test_f, bcs, M, **params)
         y0.assign(y_s)
         for i in range(self._sizeb):
-            y_s += ki[i] * float(self._b[i])
+            if self._evaluations[i]:
+                y_s += ki[i] * self._b[i]
         #if self._explicit:
             #if bcs is not None:
             #    bcs.apply(y_s)
@@ -338,34 +352,39 @@ class EmbeddedTableau(Tableau):
         super().__init__(c, a, b, explicit, sdirk)
         self.b_aux = b_aux
         self.order = order
+        self._evaluations = [self._evaluations[i] or not np.isclose(b_aux[i],0) for i in range(b.size)]
+
     
-    def y_step(self, function, current_y, current_x, step, rtol=1e-3, atol=1e-6, **kwargs):
+    def y_step(self, function, current_y, current_x, step, rtol=1e-3, atol=1e-6, min_step=1e-10, **kwargs):
         """ Returns the value of y after time step step.
         Step size is controlled to get a solution that meets the tolerance. """
         dt = 0
         tn = step
         while abs(dt - step) > 1e-8:
-            if abs(tn) < 1e-10:
+            if abs(tn) < min_step:
                 if isinstance(current_y, Function):
                     return current_y.assign(np.nan)
                 return current_y * np.nan
             if abs(dt + tn) > abs(step):
                 tn = step - dt
             fem = False
-            k = self.get_k_values(function, current_y, current_x, tn, **kwargs)
-            if isinstance(k, list):
-                fem = True
-                y1 = Function(current_y)
-                y2 = Function(current_y)
-                for i in range(self._sizeb):
-                    if self._b[i] != 0:
-                        y1 += k[i] * tn * float(self._b[i])
-                    if self.b_aux[i] != 0:
-                        y2 += k[i] * tn * float(self.b_aux[i])
-            else:
-                y1 = current_y + tn * np.dot(k, self._b)
-                y2 = current_y + tn * np.dot(k, self.b_aux)
-            accept, err = measure_error(current_y, y1, y2, rtol, atol)
+            try:
+                k = self.get_k_values(function, current_y, current_x, tn, **kwargs)
+                if isinstance(k, list):
+                    fem = True
+                    y1 = Function(current_y)
+                    y2 = Function(current_y)
+                    for i in range(self._sizeb):
+                        if self._b[i] != 0:
+                            y1 += k[i] * tn * self._b[i]
+                        if self.b_aux[i] != 0:
+                            y2 += k[i] * tn * self.b_aux[i]
+                else:
+                    y1 = current_y + tn * np.dot(k, self._b)
+                    y2 = current_y + tn * np.dot(k, self.b_aux)
+                accept, err = measure_error(current_y, y1, y2, rtol, atol)
+            except Exception as e:
+                accept, err = False, 100
             
             if accept:
                 dt += tn
@@ -454,6 +473,8 @@ def measure_error(y, sol_1, sol_2, rel_tol, abs_tol, k_factor=1):
             abs_tol = Function(y).assign(rel_tol)
         E = create_error_function(sol_1, sol_2, rel_tol, abs_tol, k_factor)
         err = norm(E)
+        # print(err, rel_tol, np.max(abs(E.dat.data_with_halos)))
+        # err = np.max(abs(E.dat.data))
         return err < 1, err
     if isinstance(abs_tol, (int, float)):
         abs_tol = np.full_like(sol_1, abs_tol)
@@ -475,27 +496,27 @@ def compute_time(err, order, tn):
         tn = tn * min(a_max, max(a_min, a * (1 / err)**(1/(order+1))))
     return tn
 
-tableaus={'FE': Tableau(np.array([0]), np.array([[0]]), np.array([1]),explicit=True),
+tableaus={'FE': Tableau(np.array([0]), np.array([[0]]), np.array([1.]),explicit=True),
           'RK4': Tableau(np.array([0, 0.5, 0.5, 1]),
                          np.array([[0,0,0,0],
                                    [0.5,0,0,0],
                                    [0,0.5,0,0],
                                    [0,0,1,0]]),
                          np.array([1.0/6,1.0/3,1.0/3,1.0/6]), explicit=True),
-          'Heun': Tableau(np.array([0,1]),
+          'Heun': Tableau(np.array([0,1.]),
                           np.array([[0,0],
-                                    [1,0]]),
+                                    [1.,0]]),
                           np.array([0.5,0.5]),
                           explicit=True),
           'RK3': Tableau(np.array([0,0.5,1]),
                          np.array([[0,0,0],[0.5,0,0],[-1,2,0]]),
                          np.array([1./6,2./3,1./6]),explicit=True),
-          'BE': Tableau(np.array([1]), np.array([[1]]), np.array([1]),sdirk=True),
+          'BE': Tableau(np.array([1.]), np.array([[1.]]), np.array([1.]),sdirk=True),
           'GL4': Tableau(np.array([0.5-sqrt(3)/6, 0.5+sqrt(3)/6]),
                          np.array([[0.25, 0.25-sqrt(3)/6],
                                    [0.25+sqrt(3)/6, 0.25]]),
                          np.array([0.5, 0.5])),
-          'GL2': Tableau(np.array([0.5]), np.array([[0.5]]), np.array([1])),
+          'GL2': Tableau(np.array([0.5]), np.array([[0.5]]), np.array([1.])),
           'CN': Tableau(np.array([0, 1]), np.array([[0,0],[0.5,0.5]]),
                         np.array([0.5, 0.5])),
           'GL6': Tableau(np.array([0.5-sqrt(15)/10, 0.5, 0.5+sqrt(15)/10]),
@@ -584,7 +605,7 @@ tableaus['SD5O4'] = Tableau(np.array([1/4, 3/4, 11/20, 1/2, 1]),
 #          'SSPRK3': Strong stability preserving RK3
 
 embedded_pairs = {
-        'Heun-Euler': EmbeddedTableau(np.array([0, 1]), np.array([[0, 0], [1, 0]]), np.array([1/2, 1/2]), np.array([1, 0]), 1),
+        'Heun-Euler': EmbeddedTableau(np.array([0, 1.]), np.array([[0, 0], [1., 0]]), np.array([1/2, 1/2]), np.array([1., 0]), 1),
         'Bogacki-Shampine': EmbeddedTableau(np.array([0, 1/2, 3/4, 1]), np.array([[0,0,0,0],[1/2,0,0,0], [0, 3/4, 0, 0], [2/9,1/3,4/9,0]]), np.array([2/9,1/3,4/9,0]), np.array([7/24,1/4,1/3,1/8]), 2),
         'Fehlberg': EmbeddedTableau(np.array([0,1/4,3/8,12/13,1,1/2]), np.array([[0,0,0,0,0,0],[1/4,0,0,0,0,0], [3/32, 9/32, 0,0,0,0], [1932/2197, -7200/2197, 7296/2197, 0,0,0], [439/216, -8, 3680/513, -845/4104, 0,0], [-8/27, 2, -3544/2565, 1859/4104, -11/40, 0]]), np.array([16/135, 0, 6656/12825, 28561/56430,-9/50, 2/55]), np.array([25/216, 0, 1408/2565,2197/4104, -1/5, 0]), 4),
         'Cash-Karp': EmbeddedTableau(np.array([0,1/5,3/10,3/5,1,7/8]), np.array([[0,0,0,0,0,0],[1/5,0,0,0,0,0], [3/40,9/40,0,0,0,0],[3/10,-9/10,6/5,0,0,0],[-11/54,5/2,-70/27,35/27,0,0],[1631/55296,175/512,575/13824,44275/110592,253/4096,0]]), np.array([37/378,0,250/621,125/594,0,512/1771]), np.array([2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4]), 4),

@@ -65,6 +65,8 @@ def time_step(function, delta_t, y, initial_t,
         if isinstance(y, Function):
             if delta_t.imag != 0:
                 y.assign(y + complex(delta_t) * f)
+            elif isinstance(delta_t, complex):
+                y.assign(y + complex(delta_t) * f)
             else:
                 y.assign(y + float(delta_t) * f)
         else:
@@ -313,6 +315,8 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
         save_interval = (final_t - t) / save_steps
     else:
         save_interval = delta_t
+    if isinstance(save_interval, complex):
+        save_interval = save_interval.real
 
 
     scale = 1
@@ -398,11 +402,7 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
                         ti = initial_t
                     else:
                         ti = t + start_time2
-                    if (k+1) in solver_parameters:
-                        params = solver_parameters[k+1]
-                    else:
-                        params = None
-                    y2 = time_step_analytic(function2, step2, y2, ti, params = params)
+                    y2 = time_step_analytic(function2, step2, y2, ti)
                     if isinstance(initial_t, Constant):
                         initial_t.assign(t0)
             elif exact_flag:
@@ -468,7 +468,7 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
         if order is not None:
             delta_t = compute_time(err, order, delta_t)
             scale = delta_t
-        if fname is not None and ((save_steps == 0 and accept) or t - saved - save_interval > -1e-8):
+        if fname is not None and ((save_steps == 0 and accept) or (t - saved - save_interval).real > -1e-8):
             if isinstance(initial_y, Function):
                 f.save_function(y, idx=count_save)
                 f.set_attr('/times', str(count_save), t)
@@ -477,7 +477,7 @@ def fractional_step_inner(functions, delta_t, initial_y, initial_t, final_t,
             else:
 
                 np.savetxt(f, [[t]+[x for x in y]], delimiter=',') 
-            saved += ((t - saved + 1e-8) // save_interval) * save_interval
+            saved += ((t - saved + 1e-8).real // save_interval) * save_interval
         if not isinstance(y, Function) and not np.all(np.isfinite(y)):
             return np.nan*y
 
