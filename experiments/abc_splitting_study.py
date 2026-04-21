@@ -37,15 +37,16 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
-# --- Make repo-root imports robust when running from repo root ---
+# ---------------------------------------------------------------------
+# Repository-local imports
+# ---------------------------------------------------------------------
 THIS = Path(__file__).resolve()
 REPO = THIS.parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-# Optional SciPy expm (preferred). Fallback provided if SciPy isn't installed.
 try:
-    from scipy.linalg import expm  # type: ignore
+    from scipy.linalg import expm
 except Exception:
     expm = None
 
@@ -429,7 +430,7 @@ def run_regime(Bmult: float, T: float, dts: List[float], outdir: Path) -> Path:
                 print(
                     f"{ordering:3s}  "
                     f"err(dt_min)={err_dtmin:.6e}  "
-                    f"p≈{p_est:.2f}  "
+                    f"p={p_est:.2f}  "
                     f"max||y||/||y0||={max_norm_ratio:.6e}  "
                     f"final||y||/||y0||={final_norm_ratio:.6e}  "
                     f"max_step={max_step_ratio:.6e}  "
