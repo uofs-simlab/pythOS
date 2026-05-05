@@ -12,12 +12,13 @@ try:
     from firedrake import Function, Constant, replace, CheckpointFile, Form
     fem = True
 except:
+    print('Firedrake not available')
     fem = False
     Function = type(None)
     Constant = type(None)
 try:
     from irksome import TimeStepper
-    from irksome.ButcherTableaux import ButcherTableau
+    from irksome.tableaux.ButcherTableaux import ButcherTableau
 except Exception as e:
     print('no irksome solvers')
     ButcherTableau = type(None)
