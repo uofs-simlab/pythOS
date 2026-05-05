@@ -10,8 +10,19 @@ Requirements:
 Optional:
 
 - firedrake - for finite element capabilities
+
+	See installation instructions at https://www.firedrakeproject.org/install.html
+
 - Irksome - for additional finite element capabilities
+
+	See installation instructions at https://www.firedrakeproject.org/Irksome/
+
 - SUNDIALS (v7) - to use any of the sundials integrators for a subintegration
+
+	See installation instructions at https://sundials.readthedocs.io/en/develop/sundials/Install_link.html#installing-with-cmake
+
+	The minimal set of required packages is ARKODE, CVODE, and IDA
+
 
 ## Usage
 
