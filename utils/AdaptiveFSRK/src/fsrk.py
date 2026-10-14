@@ -3,20 +3,77 @@
 from sympy import *
 import numpy as np
 from scipy.optimize import minimize
+import subprocess
+from juliacall import Main as jl
+
+jl.seval("using RootedTrees, SymPyPythonCall")
 
 
-class AdaptiveFSRK2Tableau(object):
-    def __init__(self, c, A1, A2, baux1, baux2, b1, b2):
+class AdaptiveFSRKTableau(object):                                           
+    def __init__(self, c, A1, A2, baux1, baux2, b1, b2, order):
         """
         All params are sympy Matrices
         c, b1, b2, baux1, baux2 are all 1 dimensional
         A1, A2 are 2 dimensional
         Tableau is expected to be valid on initialization
         """
-        self.c, self.A1, self.A2, self.b1, self.b2, self.baux1, self.baux2 = c, A1, A2, b1, b2, baux1, baux2
+        self.c, self.A1, self.A2, self.b1, self.b2, self.baux1, self.baux2, self.order = c, A1, A2, b1, b2, baux1, baux2, order
 
         self.n_stages = shape(c)[0]
         self.e = Matrix([1]*self.n_stages)
+    
+    def get_order_conds(self):
+        """
+        Use a Julia script to get order conditions using RootedTrees.jl package
+        """
+        """
+        output = subprocess.run(
+            ["julia", "--project=./julia", "./julia/order_conds.jl", srepr(self.A1 + self.A2), srepr(self.baux1 + self.baux2)],
+            capture_output=True,
+            text=True, # Interpret output as text, not as bytes
+            check=True # Throw an exception if julia code fails
+        )
+
+        # Parse output
+        conditions = []
+        for line in output.stdout.splitlines():
+            conditions.append(Eq(sympify(line), 0)) # Convert string -> sympy symbols
+
+        return conditions
+        """
+        jl.seval("""
+        using RootedTrees, SymPyPythonCall
+
+        function convert_matrix(A)
+            return [SymPyPythonCall.Sym(A[i, j]) for i in 1:size(A, 1), j in 1:size(A, 2)]
+        end
+
+        function convert_vector(b)
+            return [SymPyPythonCall.Sym(b[i]) for i in 1:length(b)]
+        end
+        """)
+        symbols = {}
+
+        for matrix in (self.A1, self.A2, self.b1, self.b2, self.baux1, self.baux2, self.c):
+            for val in matrix:
+                if isinstance(val, Symbol):
+                    symbols[str(val)] = val
+
+        jl_A1 = jl.convert_matrix(self.A1)
+        jl_A2 = jl.convert_matrix(self.A2)
+        jl_b1 = jl.convert_vector(self.b1)
+        jl_b2 = jl.convert_vector(self.b2)
+
+        ark = jl.AdditiveRungeKuttaMethod([jl_A1, jl_A2], [jl_b1, jl_b2])
+        conditions = []
+
+        for p in range(1, self.order+1):
+            for t in jl.BicoloredRootedTreeIterator(p):
+                residual = jl.residual_order_condition(t, ark)
+                eq = Eq(sympify(str(residual), locals=symbols), 0)
+                conditions.append(eq)
+
+        return conditions
     
     def subs(self, sub_dict):
         """
@@ -45,7 +102,7 @@ class AdaptiveFSRK2Tableau(object):
         new_baux1 = self.baux1 - tableau.baux1
         new_baux2 = self.baux2 - tableau.baux2
 
-        difference_tableau = AdaptiveFSRK2Tableau(new_c, new_A1, new_A2, new_b1, new_b2, new_baux1, new_baux2)
+        difference_tableau = AdaptiveFSRKTableau(new_c, new_A1, new_A2, new_b1, new_b2, new_baux1, new_baux2, order=self.order)
         return difference_tableau
 
     
@@ -83,7 +140,7 @@ class AdaptiveFSRK2Tableau(object):
         print(string)
 
 
-def get_order_conds(p: int, tableau: AdaptiveFSRK2Tableau):
+def get_order_conds(p: int, tableau: AdaptiveFSRKTableau):
     """
     Return order conditions equations for adaptive FSRK method with target order p
     Will return a list of sympy equations. If an empty list is returned, it means he function does not support the given order p.
@@ -121,7 +178,7 @@ def get_order_conds(p: int, tableau: AdaptiveFSRK2Tableau):
     return expressions
 
 
-def R(tableau: AdaptiveFSRK2Tableau):
+def R(tableau: AdaptiveFSRKTableau):
     """
     Get amplification function for an FSRK2 tableau
     Formula below is from Portero paper
