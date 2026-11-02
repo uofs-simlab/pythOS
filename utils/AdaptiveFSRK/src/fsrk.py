@@ -9,70 +9,117 @@ from juliacall import Main as jl
 jl.seval("using RootedTrees, SymPyPythonCall")
 
 
-class AdaptiveFSRKTableau(object):                                           
-    def __init__(self, c, A1, A2, baux1, baux2, b1, b2, order):
+class AdaptiveFSRKTableau(object):    
+    m = 2 # Hardcoded for now. This will be an FSRK2 method
+
+    def __init__(self,
+        c: Matrix, 
+        A1: Matrix, 
+        A2: Matrix, 
+        baux1: Matrix, 
+        baux2: Matrix, 
+        b1: Matrix, 
+        b2: Matrix
+    ):
         """
         All params are sympy Matrices
         c, b1, b2, baux1, baux2 are all 1 dimensional
         A1, A2 are 2 dimensional
         Tableau is expected to be valid on initialization
         """
-        self.c, self.A1, self.A2, self.b1, self.b2, self.baux1, self.baux2, self.order = c, A1, A2, b1, b2, baux1, baux2, order
+        self.c, self.A1, self.A2, self.b1, self.b2, self.baux1, self.baux2 = c, A1, A2, b1, b2, baux1, baux2
 
         self.n_stages = shape(c)[0]
         self.e = Matrix([1]*self.n_stages)
     
-    def get_order_conds(self):
+    def get_order_conds(self, P: int):
         """
-        Use a Julia script to get order conditions using RootedTrees.jl package
-        """
-        """
-        output = subprocess.run(
-            ["julia", "--project=./julia", "./julia/order_conds.jl", srepr(self.A1 + self.A2), srepr(self.baux1 + self.baux2)],
-            capture_output=True,
-            text=True, # Interpret output as text, not as bytes
-            check=True # Throw an exception if julia code fails
-        )
+        Use a RootedTrees.jl to get order conditions for this tableau
 
-        # Parse output
-        conditions = []
-        for line in output.stdout.splitlines():
-            conditions.append(Eq(sympify(line), 0)) # Convert string -> sympy symbols
-
-        return conditions
+        P: The order to obtain conditions for
         """
+        
+        # Define functions in julia to convert Sympy matrices & vectors (1D matrix) to Julia arrays
         jl.seval("""
-        using RootedTrees, SymPyPythonCall
+            function matrix_to_array(A)
+                return [SymPyPythonCall.Sym(A[i, j]) for i in 1:size(A, 1), j in 1:size(A, 2)]
+            end
 
-        function convert_matrix(A)
-            return [SymPyPythonCall.Sym(A[i, j]) for i in 1:size(A, 1), j in 1:size(A, 2)]
-        end
-
-        function convert_vector(b)
-            return [SymPyPythonCall.Sym(b[i]) for i in 1:length(b)]
-        end
+            function vector_to_array(b)
+                return [SymPyPythonCall.Sym(b[i]) for i in 1:length(b)]
+            end
         """)
-        symbols = {}
 
+        # Get all symbols in the tableau
+        symbols = {}
         for matrix in (self.A1, self.A2, self.b1, self.b2, self.baux1, self.baux2, self.c):
             for val in matrix:
                 if isinstance(val, Symbol):
                     symbols[str(val)] = val
+        
+        # Get A & b as julia arrays
+        jl_A1 = jl.matrix_to_array(self.A1)
+        jl_A2 = jl.matrix_to_array(self.A2)
+        jl_b1 = jl.vector_to_array(self.b1)
+        jl_b2 = jl.vector_to_array(self.b2)
 
-        jl_A1 = jl.convert_matrix(self.A1)
-        jl_A2 = jl.convert_matrix(self.A2)
-        jl_b1 = jl.convert_vector(self.b1)
-        jl_b2 = jl.convert_vector(self.b2)
-
+        # Use RootedTrees to obtain order conditions
         ark = jl.AdditiveRungeKuttaMethod([jl_A1, jl_A2], [jl_b1, jl_b2])
         conditions = []
 
-        for p in range(1, self.order+1):
+        for p in range(1, P+1):
             for t in jl.BicoloredRootedTreeIterator(p):
                 residual = jl.residual_order_condition(t, ark)
+                # Convert to SymPy equation usable in python
                 eq = Eq(sympify(str(residual), locals=symbols), 0)
                 conditions.append(eq)
 
+        return conditions
+    
+    def get_stage_order_conds(self, Q: int, row_selection=None):
+        """
+        Get the stage order conditions for this tableau
+
+        Q: The stage order to get conditions for
+        row_selection: Select rows to be used. None indicates all rows.
+            Example using all rows of of A1, and only rows 2 & 4 of A2:
+            {
+                1: None,
+                2: [2, 4]
+            }
+        """
+
+        conditions = []
+        C = diag(*self.c)
+
+        if row_selection == None:
+            row_selection = {
+                i: None for i in range(1, self.m + 1)
+            }
+
+        for q in range(1, Q+1):
+            for i in range(1, self.m + 1):
+                if i == 1:
+                    A = self.A1
+                else:
+                    A = self.A2
+                
+                residual = (q * A * C**(q-1) * self.e) - (C**q * self.e)
+                rows = row_selection[i]
+
+                if rows == None:
+                    rows = [r for r in range(1, self.n_stages + 1)]
+
+                for row in rows:
+                    expr = residual[row-1]
+                    condition = Eq(expr, 0)
+
+                    # Filter out conditions which evaluate to True or False, these are not mathematically useful for us
+                    if condition is not S.true and condition is not S.false:
+                        conditions.append(condition)
+
+                    
+        
         return conditions
     
     def subs(self, sub_dict):
@@ -102,11 +149,15 @@ class AdaptiveFSRKTableau(object):
         new_baux1 = self.baux1 - tableau.baux1
         new_baux2 = self.baux2 - tableau.baux2
 
-        difference_tableau = AdaptiveFSRKTableau(new_c, new_A1, new_A2, new_b1, new_b2, new_baux1, new_baux2, order=self.order)
+        difference_tableau = AdaptiveFSRKTableau(new_c, new_A1, new_A2, new_b1, new_b2, new_baux1, new_baux2)
         return difference_tableau
 
     
     def display(self):
+        """
+        Prints the tableau to the console in a human-readable way
+        """
+
         row_count = len(self.c.col(0))
         col_count = len(self.A1.row(0))
         length = 0

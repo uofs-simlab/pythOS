@@ -20,8 +20,9 @@ symbolic_tableau = fsrk.AdaptiveFSRKTableau(
     baux1=Matrix([1, 0, 0, 0]),
     baux2=Matrix([0, 1, 0, 0]),
     b1=Matrix([Symbol('b_1', real=True), 0, Symbol('b_3', real=True), 0]),
-    b2=Matrix([0, Symbol('b_2', real=True), 0, Symbol('b_4', real=True)]),
-    order=2
+    b2=Matrix([0, Symbol('b_2', real=True), 0, Symbol('b_4', real=True)])
 )
 
-utils.print_equations(symbolic_tableau.get_order_conds(), "Order conditions found by RootedTrees.jl:")
+utils.print_equations(symbolic_tableau.get_order_conds(2), "Order conditions found by RootedTrees.jl:")
+print("")
+utils.print_equations(symbolic_tableau.get_stage_order_conds(1), "Stage order conditions:")

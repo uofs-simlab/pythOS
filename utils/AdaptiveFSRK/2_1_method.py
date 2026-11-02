@@ -21,8 +21,7 @@ expected_tableau = fsrk.AdaptiveFSRKTableau(
     baux1=Matrix([1, 0, 0, 0]),
     baux2=Matrix([0, 1, 0, 0]),
     b1=Matrix([1/10, 0, 9/10, 0]),
-    b2=Matrix([0, 1/4, 0, 3/4]),
-    order=2
+    b2=Matrix([0, 1/4, 0, 3/4])
 )
 
 
@@ -44,18 +43,16 @@ tableau = fsrk.AdaptiveFSRKTableau(
     baux1=Matrix([1, 0, 0, 0]),
     baux2=Matrix([0, 1, 0, 0]),
     b1=Matrix([Symbol('b_1', real=True), 0, Symbol('b_3', real=True), 0]),
-    b2=Matrix([0, Symbol('b_2', real=True), 0, Symbol('b_4', real=True)]),
-    order=2
+    b2=Matrix([0, Symbol('b_2', real=True), 0, Symbol('b_4', real=True)])
 )
 
-# Get the order conditions
-# TODO: Generate these using something like ketcheson rootedtrees.jl
-# Currently these are just hardcoded
-conditions = tableau.get_order_conds()
+# Get the order conditions from RootedTrees.jl
+conditions = tableau.get_order_conds(2)
 utils.print_equations(conditions, "Order conditions found by RootedTrees.jl:")
 
 # Impose restrictions from portero paper
 # TODO: Generalize! Where do these come from?
+"""
 e2 = Matrix([0,1,0,0])
 e4 = Matrix([0,0,0,1])
 restrictions = [
@@ -63,10 +60,18 @@ restrictions = [
     Eq((e2.T * tableau.A2 * tableau.e)[0,0], tableau.c[1]),  # e2^T*A2*e = c1
     Eq((e4.T * tableau.A2 * tableau.e)[0,0], tableau.c[3]),  # e4^T*A2*e = c3 
 ]
+"""
+restrictions = tableau.get_stage_order_conds(
+    1,
+    row_selection={
+        1: None,       # All rows of A1
+        2: [2, 4],     # Rows 2 and 4 of A2
+    }
+)
+utils.print_equations(restrictions, "Stage order conditions:")
 
 # Combine all equations
 equations = conditions + restrictions
-utils.print_equations(equations, "Conditions + restrictions:")
 
 # Get all symbols in all conditions
 unknowns = set()
@@ -92,6 +97,7 @@ for un in unknowns:
     print(un)
 
 solutions = solve(equations, unknowns, dict=True)
+print(solutions)
 print("Solutions:")
 for symbol in solutions[0]:
     print(f"{symbol} = {solutions[0][symbol]}")
